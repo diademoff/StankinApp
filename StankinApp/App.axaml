@@ -6,4 +6,10 @@
 	<Application.Styles>
 		<sukiUi:SukiTheme ThemeColor="Blue"/>
 	</Application.Styles>
+
+	<Application.Resources>
+		<ResourceDictionary>
+			<FontFamily x:Key="DefaultFontFamily">avares://Avalonia.Fonts.Inter/Assets#Inter</FontFamily>
+		</ResourceDictionary>
+	</Application.Resources>
 </Application>
