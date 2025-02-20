@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -8,6 +9,7 @@ namespace StankinApp.Core.ScheduleModel
 {
     public class Course
     {
+        public PairTime Time { get; set; }
         public string Subject { get; private set; }
         public string Teacher { get; private set; } // может быть null
         public string Type { get; private set; }
@@ -16,21 +18,22 @@ namespace StankinApp.Core.ScheduleModel
 
         public List<DateTime> DateSchedules { get; set; }
 
-        public Course(string subject, string teacher, string type, string subgroup, string cabinet, string dateSchedules) : this(subject, teacher, type, subgroup, cabinet, dateSchedules, DateTime.Now.Year)
+        public Course(string subject, string teacher, string type, string subgroup, string cabinet, PairTime time, string dateSchedules) : this(subject, teacher, type, subgroup, cabinet, dateSchedules, time, DateTime.Now.Year)
         { 
         }
 
-        public Course(string subject, string teacher, string type, string subgroup, string cabinet, string dateSchedules, int year) 
+        public Course(string subject, string teacher, string type, string subgroup, string cabinet, string dateSchedules, PairTime time, int year) 
         {
             Subject = subject ?? throw new ArgumentNullException(nameof(subject));
             Teacher = teacher;
             Type = type ?? throw new ArgumentNullException(nameof(type));
             Subgroup = subgroup;
             Cabinet = cabinet ?? throw new ArgumentNullException(nameof(cabinet));
+            Time = time;
             DateSchedules = ParseDates(dateSchedules, new DateTime(year, 1, 1));
         }
 
-        public static List<Course> Parse(string input)
+        public static List<Course> Parse(string input, PairTime pairTime)
         {
             var entries = new List<Course>();
             var matches = GetCoursesInString(input) ?? throw new Exception("empty course matches");
@@ -46,12 +49,22 @@ namespace StankinApp.Core.ScheduleModel
                     var cabinet = match.Groups["cabinet"].Value.Trim();
                     var datesString = match.Groups["dates"].Value.Trim();
 
-                    var entry = new Course(subject, teacher, type, subgroup, cabinet, datesString);
+                    var entry = new Course(subject, teacher, type, subgroup, cabinet, pairTime, datesString);
 
                     entries.Add(entry);
                 }
             }
             return entries;
+        }
+
+        public bool IsInDate(DateTime date)
+        {
+            foreach (var courseDates in DateSchedules)
+            {
+                if (courseDates.Day == date.Day && courseDates.Month == date.Month)
+                    return true;
+            }
+            return false;
         }
 
         /// <summary>
@@ -72,6 +85,19 @@ namespace StankinApp.Core.ScheduleModel
 
         List<DateTime> ParseDates(string datesString, DateTime year)
         {
+            if (datesString.Contains(','))
+            {
+                // Например
+                // 13.02-24.04 к.н., 15.05
+                string[] subDates = datesString.Split(',').Select(x => x.Trim()).ToArray();
+                var dates = new List<DateTime>();
+                foreach (var date in subDates)
+                {
+                    dates.AddRange(ParseDates(date, year));
+                }
+                return dates;
+            }
+
             var dateSchedules = new List<DateTime>();
 
             // делим по запятым, чтобы поддержать несколько дат/диапазонов

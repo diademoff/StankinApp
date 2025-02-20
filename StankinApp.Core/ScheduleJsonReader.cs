@@ -23,11 +23,11 @@ namespace StankinApp.Core
 
                 foreach (var timeSlotEntry in dayEntry.Value)
                 {
-                    var timeSlot = new TimeSlot(timeSlotEntry.Key);
+                    var timeSlot = new TimeSlot(timeSlotEntry.Key, daySchedule.Day);
 
                     // тупо сохраняем всю строку как название курса
                     foreach (var courseStr in timeSlotEntry.Value)
-                        timeSlot.Courses.AddRange(Course.Parse(courseStr));
+                        timeSlot.Courses.AddRange(Course.Parse(courseStr, timeSlot.SlotTime));
 
                     daySchedule.TimeSlots.Add(timeSlot);
                 }
