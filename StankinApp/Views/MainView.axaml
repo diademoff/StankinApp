@@ -3,7 +3,8 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="clr-namespace:StankinApp.ViewModels"
-			 xmlns:sukiUi="clr-namespace:SukiUI.Controls;assembly=SukiUI"
+			 xmlns:cherylUi="clr-namespace:CherylUI;assembly=CherylUI"
+		     xmlns:controls="clr-namespace:CherylUI.Controls;assembly=CherylUI"
              mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="900"
              x:Class="StankinApp.Views.MainView"
              x:DataType="vm:MainViewModel">
@@ -11,65 +12,64 @@
     <vm:MainViewModel />
   </Design.DataContext>
 
-	<Grid>
-		<ScrollViewer Margin="50 10">
-			
-			<ItemsControl ItemsSource="{Binding Schedule}">
-						
-				<ItemsControl.ItemTemplate>
-					<DataTemplate>
-						<StackPanel>
-							<!--Контейнер для дня-->
-							<TextBlock Text="{Binding Date}"/>
-							
-							<ItemsControl ItemsSource="{Binding Courses}">
-								<ItemsControl.ItemTemplate>
-									<DataTemplate>
-										<!--Расписание на день-->
-										<sukiUi:GlassCard Margin="0 5">
-											<Grid>
-												<Grid.ColumnDefinitions>
-													<ColumnDefinition Width="auto"/>
-													<ColumnDefinition Width="*"/>
-													<ColumnDefinition Width="auto"/>
-												</Grid.ColumnDefinitions>
+	<ScrollViewer Margin="50 10" Name="scrollviewer">
 
-												<StackPanel Grid.Column="0" VerticalAlignment="Center">
-													<TextBlock Text="{Binding Time.TimeBeginPretty}" FontSize="16"/>
-													<TextBlock Text="{Binding Time.TimeEndPretty}" FontSize="16"/>
-												</StackPanel>
+		<ItemsControl ItemsSource="{Binding Schedule}">
 
-												<StackPanel Grid.Column="1" Margin="10 0">
-													<TextBlock FontSize="18" TextWrapping="WrapWithOverflow" Text="{Binding Subject}"/>
+			<ItemsControl.ItemTemplate>
+				<DataTemplate>
+					<StackPanel>
+						<!--Контейнер для дня-->
+						<TextBlock Text="{Binding Date, StringFormat='{}{0:dddd, d MMM}'}"/>
 
-													<Grid Margin="0 3 0 0">
-														<Grid.ColumnDefinitions>
-															<ColumnDefinition Width="auto"/>
-															<ColumnDefinition Width="*"/>
-															<ColumnDefinition Width="auto"/>
-														</Grid.ColumnDefinitions>
-														<TextBlock Grid.Column="0" FontSize="12" Text="{Binding Teacher}"/>
-														<TextBlock Grid.Column="2" FontSize="12" Text="{Binding Type}"/>
-													</Grid>
-													<ProgressBar Margin="0 5 0 0"/>
-												</StackPanel>
+						<ItemsControl ItemsSource="{Binding Courses}">
+							<ItemsControl.ItemTemplate>
+								<DataTemplate>
+									<!--Расписание на день-->
+									<Border Margin="0 15">
+										<Grid>
+											<Grid.ColumnDefinitions>
+												<ColumnDefinition Width="auto"/>
+												<ColumnDefinition Width="*"/>
+												<ColumnDefinition Width="auto"/>
+											</Grid.ColumnDefinitions>
 
-												<StackPanel Grid.Column="2" VerticalAlignment="Center">
-													<TextBlock Text="{Binding Cabinet}"/>
-												</StackPanel>
-											</Grid>
-										</sukiUi:GlassCard>
-									</DataTemplate>
-								</ItemsControl.ItemTemplate>
-							</ItemsControl>
-						</StackPanel>
-					</DataTemplate>
-				</ItemsControl.ItemTemplate>
-			</ItemsControl>
+											<StackPanel Grid.Column="0" VerticalAlignment="Center">
+												<TextBlock Text="{Binding Time.TimeBeginPretty}" FontSize="16"/>
+												<TextBlock Text="{Binding Time.TimeEndPretty}" FontSize="16"/>
+											</StackPanel>
+
+											<StackPanel Grid.Column="1" Margin="10 0">
+												<TextBlock FontSize="18" TextWrapping="WrapWithOverflow" Text="{Binding Subject}"/>
+
+												<Grid Margin="0 3 0 0">
+													<Grid.ColumnDefinitions>
+														<ColumnDefinition Width="auto"/>
+														<ColumnDefinition Width="*"/>
+														<ColumnDefinition Width="auto"/>
+													</Grid.ColumnDefinitions>
+													<TextBlock Grid.Column="0" FontSize="12" Text="{Binding Teacher}"/>
+													<TextBlock Grid.Column="2" FontSize="12" Text="{Binding Type}"/>
+												</Grid>
+												<ProgressBar Margin="0 5 0 0"/>
+											</StackPanel>
+
+											<StackPanel Grid.Column="2" VerticalAlignment="Center">
+												<TextBlock Text="{Binding Cabinet}"/>
+											</StackPanel>
+										</Grid>
+									</Border>
+
+								</DataTemplate>
+							</ItemsControl.ItemTemplate>
+						</ItemsControl>
+					</StackPanel>
+				</DataTemplate>
+			</ItemsControl.ItemTemplate>
+		</ItemsControl>
 
 
-		</ScrollViewer>
+	</ScrollViewer>
 		
-	</Grid>
 	
 </UserControl>

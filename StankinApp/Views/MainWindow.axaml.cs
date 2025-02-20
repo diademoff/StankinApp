@@ -1,14 +1,12 @@
-﻿using Avalonia.Styling;
-using SukiUI;
-using SukiUI.Controls;
+﻿using Avalonia.Controls;
+using Avalonia.Styling;
 
 namespace StankinApp.Views;
 
-public partial class MainWindow : SukiWindow
+public partial class MainWindow : Window
 {
     public MainWindow()
     {
-        SukiTheme.GetInstance().ChangeBaseTheme(ThemeVariant.Light);
         InitializeComponent();
     }
 }

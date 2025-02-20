@@ -4,7 +4,7 @@
 			 xmlns:sukiUi="clr-namespace:SukiUI;assembly=SukiUI"
              RequestedThemeVariant="Default">
 	<Application.Styles>
-		<sukiUi:SukiTheme ThemeColor="Blue"/>
+		<StyleInclude Source="avares://CherylUI/Index.axaml" />
 	</Application.Styles>
 
 	<Application.Resources>
