@@ -12,9 +12,57 @@ namespace StankinApp.Core.ScheduleModel
         public PairTime Time { get; set; }
         public string Subject { get; private set; }
         public string Teacher { get; private set; } // может быть null
-        public string Type { get; private set; }
+        string _type;
+        public string Type
+        {
+            get
+            {
+                if (_type == "лабораторные занятия")
+                    return "Л.Р.";
+                return _type;
+            }
+        }
+
+        public bool AnySubgroup => !string.IsNullOrWhiteSpace(Subgroup);
         public string Subgroup { get; private set; } // может быть null
         public string Cabinet { get; private set; }
+        public bool IsNow
+        {
+            get
+            {
+                var n = DateTime.Now;
+                n = new DateTime(2025, 2, 24, 9, 0, 0);
+
+                if (DateSchedules.Where(x => x.Day == n.Day && x.Month == n.Month).Any())
+                {
+                    DateTime tb = new DateTime(n.Year, n.Month, n.Day, Time.TimeBegin.Hour, Time.TimeBegin.Minute, 0);
+                    DateTime te = new DateTime(n.Year, n.Month, n.Day, Time.TimeEnd.Hour, Time.TimeEnd.Minute, 0);
+                    if (n >= tb)
+                    {
+                        if (n <= te)
+                        {
+                            return true;
+                        }
+                    }
+                }
+
+                return false;
+            }
+        }
+        public double TimeProgress
+        {
+            get
+            {
+                var n = DateTime.Now;
+                n = new DateTime(2025, 2, 24, 10, 0, 0);
+                if (!IsNow)
+                    return 0;
+                DateTime tb = new DateTime(n.Year, n.Month, n.Day, Time.TimeBegin.Hour, Time.TimeBegin.Minute, 0);
+                DateTime te = new DateTime(n.Year, n.Month, n.Day, Time.TimeEnd.Hour, Time.TimeEnd.Minute, 0);
+
+                return (n - tb).TotalSeconds / (te - tb).TotalSeconds * 100;
+            }
+        }
 
         public List<DateTime> DateSchedules { get; set; }
 
@@ -26,7 +74,7 @@ namespace StankinApp.Core.ScheduleModel
         {
             Subject = subject ?? throw new ArgumentNullException(nameof(subject));
             Teacher = teacher;
-            Type = type ?? throw new ArgumentNullException(nameof(type));
+            _type = type ?? throw new ArgumentNullException(nameof(type));
             Subgroup = subgroup;
             Cabinet = cabinet ?? throw new ArgumentNullException(nameof(cabinet));
             Time = time;

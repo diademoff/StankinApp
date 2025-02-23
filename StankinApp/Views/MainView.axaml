@@ -5,14 +5,16 @@
              xmlns:vm="clr-namespace:StankinApp.ViewModels"
 			 xmlns:cherylUi="clr-namespace:CherylUI;assembly=CherylUI"
 		     xmlns:controls="clr-namespace:CherylUI.Controls;assembly=CherylUI"
-             mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="900"
+			 xmlns:glassMorphism="clr-namespace:CherylUI.Controls.GlassMorphism"
+			 xmlns:glassmorphism="clr-namespace:CherylUI.Glassmorphism"
+             mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="900"
              x:Class="StankinApp.Views.MainView"
              x:DataType="vm:MainViewModel">
   <Design.DataContext>
     <vm:MainViewModel />
   </Design.DataContext>
 
-	<ScrollViewer Margin="50 10" Name="scrollviewer">
+	<ScrollViewer Margin="10 10" Name="scrollviewer">
 
 		<ItemsControl ItemsSource="{Binding Schedule}">
 
@@ -20,49 +22,73 @@
 				<DataTemplate>
 					<StackPanel>
 						<!--Контейнер для дня-->
-						<TextBlock Text="{Binding Date, StringFormat='{}{0:dddd, d MMM}'}"/>
+						<controls:GroupBox Header="{Binding Date, StringFormat='{}{0:dddd, d MMM}'}">
+							<ItemsControl ItemsSource="{Binding Courses}">
+								<ItemsControl.ItemTemplate>
+									<DataTemplate>
+										<!--Расписание на день Margin="0 15"-->
+										<Border BorderThickness="0" Margin="3 10">
+											<Grid>
+												<Grid.ColumnDefinitions>
+													<ColumnDefinition Width="auto"/>
+													<ColumnDefinition Width="*"/>
+													<ColumnDefinition Width="55"/>
+												</Grid.ColumnDefinitions>
+												<Grid.RowDefinitions>
+													<RowDefinition Height="*"/>
+													<RowDefinition Height="auto"/>
+												</Grid.RowDefinitions>
 
-						<ItemsControl ItemsSource="{Binding Courses}">
-							<ItemsControl.ItemTemplate>
-								<DataTemplate>
-									<!--Расписание на день-->
-									<Border Margin="0 15">
-										<Grid>
-											<Grid.ColumnDefinitions>
-												<ColumnDefinition Width="auto"/>
-												<ColumnDefinition Width="*"/>
-												<ColumnDefinition Width="auto"/>
-											</Grid.ColumnDefinitions>
+												<StackPanel Grid.Column="0" VerticalAlignment="Center">
+													<TextBlock Text="{Binding Time.TimeBeginPretty}" FontSize="16"/>
+													<TextBlock Text="{Binding Time.TimeEndPretty}" FontSize="16"/>
+												</StackPanel>
 
-											<StackPanel Grid.Column="0" VerticalAlignment="Center">
-												<TextBlock Text="{Binding Time.TimeBeginPretty}" FontSize="16"/>
-												<TextBlock Text="{Binding Time.TimeEndPretty}" FontSize="16"/>
-											</StackPanel>
+												<StackPanel Grid.Column="1" Margin="10 0">
+													<TextBlock FontSize="18" TextWrapping="WrapWithOverflow" Text="{Binding Subject}"/>
 
-											<StackPanel Grid.Column="1" Margin="10 0">
-												<TextBlock FontSize="18" TextWrapping="WrapWithOverflow" Text="{Binding Subject}"/>
+													<Grid Margin="0 3 0 0">
+														<Grid.ColumnDefinitions>
+															<ColumnDefinition Width="auto"/>
+															<ColumnDefinition Width="*"/>
+															<ColumnDefinition Width="auto"/>
+															<ColumnDefinition Width="auto"/>
+														</Grid.ColumnDefinitions>
+														<TextBlock Grid.Column="0" FontSize="12" Text="{Binding Teacher}" VerticalAlignment="Center"/>
+														<Grid Grid.Column="2">
+															<Grid.ColumnDefinitions>
+																<ColumnDefinition/>
+																<ColumnDefinition/>
+															</Grid.ColumnDefinitions>
+															
+															<TextBlock Grid.Column="0" 
+																	   FontSize="12" 
+																	   Text="{Binding Type}" 
+																	   TextWrapping="WrapWithOverflow" 
+																	   VerticalAlignment="Center" 
+																	   HorizontalAlignment="Left"
+																	   MaxWidth="85"/>
+															
+															<Border IsVisible="{Binding AnySubgroup}"  Grid.Column="1" BorderThickness="1" BorderBrush="Blue" CornerRadius="10" Margin="0 3">
+																<TextBlock Classes="Secondary" Margin="5 5" FontStyle="Italic" FontSize="12" Text="{Binding Subgroup}"/>
+															</Border>
 
-												<Grid Margin="0 3 0 0">
-													<Grid.ColumnDefinitions>
-														<ColumnDefinition Width="auto"/>
-														<ColumnDefinition Width="*"/>
-														<ColumnDefinition Width="auto"/>
-													</Grid.ColumnDefinitions>
-													<TextBlock Grid.Column="0" FontSize="12" Text="{Binding Teacher}"/>
-													<TextBlock Grid.Column="2" FontSize="12" Text="{Binding Type}"/>
-												</Grid>
-												<ProgressBar Margin="0 5 0 0"/>
-											</StackPanel>
+														</Grid>
+													</Grid>
+												</StackPanel>
 
-											<StackPanel Grid.Column="2" VerticalAlignment="Center">
-												<TextBlock Text="{Binding Cabinet}"/>
-											</StackPanel>
-										</Grid>
-									</Border>
+												<StackPanel Grid.Column="2" VerticalAlignment="Center">
+													<TextBlock Text="{Binding Cabinet}" TextWrapping="WrapWithOverflow"/>
+												</StackPanel>
 
-								</DataTemplate>
-							</ItemsControl.ItemTemplate>
-						</ItemsControl>
+												<ProgressBar IsVisible="{Binding IsNow}" Value="{Binding TimeProgress}" Margin="40 2" Grid.Column="0" Grid.Row="1" Grid.ColumnSpan="3"/>
+											</Grid>
+										</Border>
+
+									</DataTemplate>
+								</ItemsControl.ItemTemplate>
+							</ItemsControl>
+						</controls:GroupBox>
 					</StackPanel>
 				</DataTemplate>
 			</ItemsControl.ItemTemplate>

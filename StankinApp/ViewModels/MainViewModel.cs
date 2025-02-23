@@ -1,4 +1,5 @@
 ﻿using Avalonia.Platform;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using StankinApp.Core;
 using StankinApp.Core.ScheduleModel;
@@ -31,6 +32,16 @@ public partial class MainViewModel : ObservableObject
             new DateSchedule(DateTime.Now.AddDays(4), GetCoursesForDate(DateTime.Now.AddDays(4)).ToArray()),
             new DateSchedule(DateTime.Now.AddDays(5), GetCoursesForDate(DateTime.Now.AddDays(5)).ToArray()),
         ]);
+
+        var timer = new DispatcherTimer();
+        timer.Interval = TimeSpan.FromSeconds(10);
+        timer.Tick += RedrawTick;
+        timer.Start();
+    }
+
+    private void RedrawTick(object? sender, EventArgs e)
+    {
+        OnPropertyChanged(nameof(Schedule));
     }
 
     List<Course> GetCoursesForDate(DateTime date)
