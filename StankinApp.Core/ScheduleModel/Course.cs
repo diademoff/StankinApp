@@ -31,7 +31,6 @@ namespace StankinApp.Core.ScheduleModel
             get
             {
                 var n = DateTime.Now;
-                n = new DateTime(2025, 2, 24, 9, 0, 0);
 
                 if (DateSchedules.Where(x => x.Day == n.Day && x.Month == n.Month).Any())
                 {
@@ -54,7 +53,6 @@ namespace StankinApp.Core.ScheduleModel
             get
             {
                 var n = DateTime.Now;
-                n = new DateTime(2025, 2, 24, 10, 0, 0);
                 if (!IsNow)
                     return 0;
                 DateTime tb = new DateTime(n.Year, n.Month, n.Day, Time.TimeBegin.Hour, Time.TimeBegin.Minute, 0);

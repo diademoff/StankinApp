@@ -5,8 +5,6 @@
              xmlns:vm="clr-namespace:StankinApp.ViewModels"
 			 xmlns:cherylUi="clr-namespace:CherylUI;assembly=CherylUI"
 		     xmlns:controls="clr-namespace:CherylUI.Controls;assembly=CherylUI"
-			 xmlns:glassMorphism="clr-namespace:CherylUI.Controls.GlassMorphism"
-			 xmlns:glassmorphism="clr-namespace:CherylUI.Glassmorphism"
              mc:Ignorable="d" d:DesignWidth="400" d:DesignHeight="900"
              x:Class="StankinApp.Views.MainView"
              x:DataType="vm:MainViewModel">
