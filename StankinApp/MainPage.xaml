@@ -1,0 +1,110 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="StankinApp.MainPage"
+             xmlns:local="clr-namespace:StankinApp.ViewModels"
+             x:DataType="local:MainViewModel">
+
+    <ContentPage.BindingContext>
+        <local:MainViewModel/>
+    </ContentPage.BindingContext>
+    
+    <ScrollView>
+        <CollectionView ItemsSource="{Binding Schedule}">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Grid>
+                        <!--Дата-->
+                        <Label Text="{Binding Date, StringFormat='{0:dd.MM.yyyy}'}" 
+                               FontAttributes="Bold" 
+                               Margin="10,5"/>
+
+                        <!--Расписание на дату-->
+                        <CollectionView ItemsSource="{Binding Courses}">
+                            <CollectionView.ItemTemplate>
+                                <DataTemplate>
+                                    <Label Text="{Binding Subject}" />
+                                    <!--<Border StrokeThickness="0" Margin="3,10">
+                                                <Grid>
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="Auto"/>
+                                                        <ColumnDefinition Width="*"/>
+                                                        <ColumnDefinition Width="55"/>
+                                                    </Grid.ColumnDefinitions>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="*"/>
+                                                        <RowDefinition Height="Auto"/>
+                                                    </Grid.RowDefinitions>
+
+                                                    <StackLayout Grid.Column="0" VerticalOptions="Center">
+                                                        <Label Text="{Binding Time.TimeBeginPretty}" FontSize="16"/>
+                                                        <Label Text="{Binding Time.TimeEndPretty}" FontSize="16"/>
+                                                    </StackLayout>
+
+                                                    <StackLayout Grid.Column="1" Margin="10,0">
+                                                        <Label FontSize="18" 
+                                                       LineBreakMode="WordWrap" 
+                                                       Text="{Binding Subject}"/>
+
+                                                        <Grid Margin="0,3,0,0">
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="*"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                                <ColumnDefinition Width="Auto"/>
+                                                            </Grid.ColumnDefinitions>
+
+                                                            <Label Grid.Column="0" 
+                                                           FontSize="12" 
+                                                           Text="{Binding Teacher}" 
+                                                           VerticalOptions="Center"/>
+
+                                                            <Grid Grid.Column="2">
+                                                                <Grid.ColumnDefinitions>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                    <ColumnDefinition Width="*"/>
+                                                                </Grid.ColumnDefinitions>
+
+                                                                <Label Grid.Column="0" 
+                                                               FontSize="12" 
+                                                               Text="{Binding Type}" 
+                                                               LineBreakMode="WordWrap" 
+                                                               VerticalOptions="Center" 
+                                                               HorizontalOptions="Start"
+                                                               WidthRequest="85"/>
+
+                                                                <Border Grid.Column="1" 
+                                                                IsVisible="{Binding AnySubgroup}"
+                                                                Margin="0,3">
+                                                                    <Label StyleClass="Secondary" 
+                                                                   Margin="5,5" 
+                                                                   FontAttributes="Italic" 
+                                                                   FontSize="12" 
+                                                                   Text="{Binding Subgroup}"/>
+                                                                </Border>
+                                                            </Grid>
+                                                        </Grid>
+                                                    </StackLayout>
+
+                                                    <StackLayout Grid.Column="2" VerticalOptions="Center">
+                                                        <Label Text="{Binding Cabinet}" LineBreakMode="WordWrap"/>
+                                                    </StackLayout>
+
+                                                    <ProgressBar IsVisible="{Binding IsNow}" 
+                                                         Progress="{Binding TimeProgress}" 
+                                                         Margin="40,2" 
+                                                         Grid.Column="0" 
+                                                         Grid.Row="1" 
+                                                         Grid.ColumnSpan="3"/>
+                                                </Grid>
+                                            </Border>-->
+                                </DataTemplate>
+                            </CollectionView.ItemTemplate>
+                        </CollectionView>
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+    </ScrollView>
+
+</ContentPage>
