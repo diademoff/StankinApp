@@ -7,14 +7,14 @@ namespace StankinApp.Core
 {
     public class ScheduleJsonReader
     {
-        public static Schedule GetSchedule(string jsonString)
+        public static Schedule GetSchedule(string groupName, string jsonString)
         {
             // десериализуем json как словарь: ключ – день недели, значение – словарь с тайм-слотами и массивами курсов
             var rawSchedule = JsonSerializer.Deserialize<Dictionary<string, Dictionary<string, string[]>>>(jsonString);
             if (rawSchedule == null)
                 throw new Exception("не удалось распарсить json");
 
-            var schedule = new Schedule(new List<DaySchedule>());
+            var schedule = new Schedule(groupName, new List<DaySchedule>());
 
             // мапим каждый день и его тайм-слоты в структуру
             foreach (var dayEntry in rawSchedule)
@@ -27,7 +27,7 @@ namespace StankinApp.Core
 
                     // тупо сохраняем всю строку как название курса
                     foreach (var courseStr in timeSlotEntry.Value)
-                        timeSlot.Courses.AddRange(Course.Parse(courseStr, timeSlot.SlotTime));
+                        timeSlot.Courses.AddRange(Course.Parse(courseStr, timeSlot.SlotTime, schedule.GroupName));
 
                     daySchedule.TimeSlots.Add(timeSlot);
                 }

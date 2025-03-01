@@ -10,6 +10,7 @@ namespace StankinApp.Core.ScheduleModel
     public class Course
     {
         public PairTime Time { get; set; }
+        public string GroupName { get; set; }
         public string Subject { get; private set; }
         public string Teacher { get; private set; } // может быть null
         string _type;
@@ -26,28 +27,7 @@ namespace StankinApp.Core.ScheduleModel
         public bool AnySubgroup => !string.IsNullOrWhiteSpace(Subgroup);
         public string Subgroup { get; private set; } // может быть null
         public string Cabinet { get; private set; }
-        public bool IsNow
-        {
-            get
-            {
-                var n = DateTime.Now;
-
-                if (DateSchedules.Where(x => x.Day == n.Day && x.Month == n.Month).Any())
-                {
-                    DateTime tb = new DateTime(n.Year, n.Month, n.Day, Time.TimeBegin.Hour, Time.TimeBegin.Minute, 0);
-                    DateTime te = new DateTime(n.Year, n.Month, n.Day, Time.TimeEnd.Hour, Time.TimeEnd.Minute, 0);
-                    if (n >= tb)
-                    {
-                        if (n <= te)
-                        {
-                            return true;
-                        }
-                    }
-                }
-
-                return false;
-            }
-        }
+        public bool IsNow => IsInTime(DateTime.Now);
         public double TimeProgress
         {
             get
@@ -64,11 +44,12 @@ namespace StankinApp.Core.ScheduleModel
 
         public List<DateTime> DateSchedules { get; set; }
 
-        public Course(string subject, string teacher, string type, string subgroup, string cabinet, PairTime time, string dateSchedules) : this(subject, teacher, type, subgroup, cabinet, dateSchedules, time, DateTime.Now.Year)
-        { 
+        public Course(string subject, string teacher, string type, string subgroup, string cabinet, PairTime time, string dateSchedules, string groupName) : this(subject, teacher, type, subgroup, cabinet, dateSchedules, time, DateTime.Now.Year, groupName)
+        {
+
         }
 
-        public Course(string subject, string teacher, string type, string subgroup, string cabinet, string dateSchedules, PairTime time, int year) 
+        public Course(string subject, string teacher, string type, string subgroup, string cabinet, string dateSchedules, PairTime time, int year, string groupName) 
         {
             Subject = subject ?? throw new ArgumentNullException(nameof(subject));
             Teacher = teacher;
@@ -77,9 +58,34 @@ namespace StankinApp.Core.ScheduleModel
             Cabinet = cabinet ?? throw new ArgumentNullException(nameof(cabinet));
             Time = time;
             DateSchedules = ParseDates(dateSchedules, new DateTime(year, 1, 1));
+            GroupName = groupName;
         }
 
-        public static List<Course> Parse(string input, PairTime pairTime)
+        public bool IsInTime(DateTime n)
+        {
+            //var n = DateTime.Now;
+            if (DateSchedules.Where(x => x.Day == n.Day && x.Month == n.Month).Any())
+            {
+                DateTime tb = new DateTime(n.Year, n.Month, n.Day, Time.TimeBegin.Hour, Time.TimeBegin.Minute, 0);
+                DateTime te = new DateTime(n.Year, n.Month, n.Day, Time.TimeEnd.Hour, Time.TimeEnd.Minute, 0);
+                if (n >= tb)
+                {
+                    if (n <= te)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        public bool IsInTime(Time t)
+        {
+            return Time.Contains(t);
+        }
+
+        public static List<Course> Parse(string input, PairTime pairTime, string groupName)
         {
             var entries = new List<Course>();
             var matches = GetCoursesInString(input) ?? throw new Exception("empty course matches");
@@ -95,7 +101,7 @@ namespace StankinApp.Core.ScheduleModel
                     var cabinet = match.Groups["cabinet"].Value.Trim();
                     var datesString = match.Groups["dates"].Value.Trim();
 
-                    var entry = new Course(subject, teacher, type, subgroup, cabinet, pairTime, datesString);
+                    var entry = new Course(subject, teacher, type, subgroup, cabinet, pairTime, datesString, groupName);
 
                     entries.Add(entry);
                 }
