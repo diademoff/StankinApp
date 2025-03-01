@@ -8,11 +8,13 @@ namespace StankinApp.Core.ScheduleModel
     /// </summary>
     public class Schedule
     {
+        public string GroupName { get; private set; }
         public List<DaySchedule> Days { get; private set; }
 
-        public Schedule(List<DaySchedule> days)
+        public Schedule(string groupName, List<DaySchedule> days)
         {
             Days = days ?? throw new ArgumentNullException(nameof(days));
+            GroupName = groupName;
         }
     }
 }
