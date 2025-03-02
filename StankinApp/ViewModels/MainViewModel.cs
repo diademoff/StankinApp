@@ -68,7 +68,7 @@ namespace StankinApp.ViewModels
                 return [];
 
             var jsonstr = new StreamReader(FileSystem.OpenAppPackageFileAsync("ADB-23-07.json").Result).ReadToEnd();
-            Schedule schedule = ScheduleJsonReader.GetSchedule(jsonstr);
+            Schedule schedule = ScheduleJsonReader.GetSchedule("АДБ-23-07", jsonstr);
 
             DayOfWeek todayDayOfWeek = date.DayOfWeek;
             DaySchedule todaySchedule = schedule.Days[(int)todayDayOfWeek - 1];
