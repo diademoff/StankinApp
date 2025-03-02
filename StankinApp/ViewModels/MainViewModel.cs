@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using StankinApp.Core;
 using StankinApp.Core.ScheduleModel;
 using System.Collections.ObjectModel;
@@ -24,21 +25,33 @@ namespace StankinApp.ViewModels
         [ObservableProperty]
         ObservableCollection<DateSchedule> _schedule;
 
+        int _futureDaysAdded = 0;
         public MainViewModel()
         {
             //_courses = new ObservableCollection<Course>(GetCoursesForDate(DateTime.Now));
 
-            Schedule = new ObservableCollection<DateSchedule>(
-            [
-                new DateSchedule(DateTime.Now, GetCoursesForDate(DateTime.Now).ToArray()),
-                new DateSchedule(DateTime.Now.AddDays(1), GetCoursesForDate(DateTime.Now.AddDays(1)).ToArray()),
-                new DateSchedule(DateTime.Now.AddDays(2), GetCoursesForDate(DateTime.Now.AddDays(2)).ToArray()),
-                new DateSchedule(DateTime.Now.AddDays(3), GetCoursesForDate(DateTime.Now.AddDays(3)).ToArray()),
-                new DateSchedule(DateTime.Now.AddDays(4), GetCoursesForDate(DateTime.Now.AddDays(4)).ToArray()),
-                new DateSchedule(DateTime.Now.AddDays(5), GetCoursesForDate(DateTime.Now.AddDays(5)).ToArray()),
-            ]);
-
+            Schedule = new ObservableCollection<DateSchedule>();
+            AddFutureDay(5);
             OnPropertyChanged(nameof(Schedule));
+        }
+
+        void AddFutureDay(int range)
+        {
+            for (int i = 0; i < range; i++)
+                AddFutureDay();
+        }
+
+        void AddFutureDay()
+        {
+            Schedule.Add(new DateSchedule(DateTime.Now.AddDays(_futureDaysAdded),
+                        GetCoursesForDate(DateTime.Now.AddDays(_futureDaysAdded)).ToArray()));
+            _futureDaysAdded++;
+        }
+
+        [RelayCommand]
+        public void BottomReached()
+        {
+            AddFutureDay();
         }
 
         // TODO: timer

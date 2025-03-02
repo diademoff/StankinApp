@@ -10,7 +10,9 @@
         <local:MainViewModel/>
     </ContentPage.BindingContext>
 
-    <CollectionView ItemsSource="{Binding Schedule}">
+    <CollectionView ItemsSource="{Binding Schedule}"
+                    RemainingItemsThreshold="1"
+                    RemainingItemsThresholdReachedCommand="{Binding BottomReachedCommand}">
         <CollectionView.ItemTemplate>
             <DataTemplate x:DataType="local:DateSchedule">
                 <Grid RowDefinitions="auto, *">
