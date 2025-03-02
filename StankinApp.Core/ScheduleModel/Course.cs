@@ -1,14 +1,19 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 
 namespace StankinApp.Core.ScheduleModel
 {
-    public class Course
+    public class Course : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler PropertyChanged;
+        void OnPropertyChanged(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+
         public PairTime Time { get; set; }
         public string GroupName { get; set; }
         public string Subject { get; private set; }
@@ -27,18 +32,30 @@ namespace StankinApp.Core.ScheduleModel
         public bool AnySubgroup => !string.IsNullOrWhiteSpace(Subgroup);
         public string Subgroup { get; private set; } // может быть null
         public string Cabinet { get; private set; }
-        public bool IsNow => IsInTime(DateTime.Now);
+        public bool IsNow => IsInTime(DateTime.Now.AddHours(14));
         public double TimeProgress
         {
             get
             {
-                var n = DateTime.Now;
+                var n = DateTime.Now.AddHours(14);
                 if (!IsNow)
                     return 0;
                 DateTime tb = new DateTime(n.Year, n.Month, n.Day, Time.TimeBegin.Hour, Time.TimeBegin.Minute, 0);
                 DateTime te = new DateTime(n.Year, n.Month, n.Day, Time.TimeEnd.Hour, Time.TimeEnd.Minute, 0);
 
-                return (n - tb).TotalSeconds / (te - tb).TotalSeconds * 100;
+                double res = (n - tb).TotalSeconds / (te - tb).TotalSeconds;
+
+                if (res > 0 && res < 1)
+                {
+                    Task.Run(async () =>
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(5));
+                        OnPropertyChanged(nameof(TimeProgress));
+                        OnPropertyChanged(nameof(IsNow));
+                    });
+                }
+
+                return res;
             }
         }
 
