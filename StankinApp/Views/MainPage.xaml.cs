@@ -4,13 +4,12 @@ namespace StankinApp
 {
     public partial class MainPage : ContentPage
     {
-        MainViewModel context = new MainViewModel();
-
-        public MainPage()
+        MainViewModel _context;
+        public MainPage(MainViewModel context)
         {
             InitializeComponent();
+            _context = context;
             this.BindingContext = context;
-            context.OnPropertyChanged();
         }
     }
 }

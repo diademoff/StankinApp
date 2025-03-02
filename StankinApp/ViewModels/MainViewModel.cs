@@ -1,4 +1,5 @@
-﻿using StankinApp.Core;
+﻿using CommunityToolkit.Mvvm.ComponentModel;
+using StankinApp.Core;
 using StankinApp.Core.ScheduleModel;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -18,32 +19,16 @@ namespace StankinApp.ViewModels
         }
     }
 
-    public partial class MainViewModel : INotifyPropertyChanged
+    public partial class MainViewModel : ObservableObject
     {
-        public event PropertyChangedEventHandler? PropertyChanged;
-        public void OnPropertyChanged([CallerMemberName] string name = "") =>
-            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-
+        [ObservableProperty]
         ObservableCollection<DateSchedule> _schedule;
-
-        public ObservableCollection<DateSchedule> Schedule
-        {
-            get
-            {
-                return _schedule;
-            }
-            set
-            {
-                _schedule = value;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Schedule)));
-            }
-        }
 
         public MainViewModel()
         {
             //_courses = new ObservableCollection<Course>(GetCoursesForDate(DateTime.Now));
 
-            _schedule = new ObservableCollection<DateSchedule>(
+            Schedule = new ObservableCollection<DateSchedule>(
             [
                 new DateSchedule(DateTime.Now, GetCoursesForDate(DateTime.Now).ToArray()),
                 new DateSchedule(DateTime.Now.AddDays(1), GetCoursesForDate(DateTime.Now.AddDays(1)).ToArray()),

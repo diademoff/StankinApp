@@ -9,28 +9,26 @@
     <ContentPage.BindingContext>
         <local:MainViewModel/>
     </ContentPage.BindingContext>
-    
-    <ScrollView>
-        <CollectionView ItemsSource="{Binding Schedule}">
-            <CollectionView.ItemTemplate>
-                <DataTemplate x:DataType="local:DateSchedule">
-                    <Grid RowDefinitions="auto, *">
-                        <!--Дата-->
-                        <Label Text="{Binding Date, StringFormat='{0:dd MMMM, dddd}'}" 
+
+    <CollectionView ItemsSource="{Binding Schedule}">
+        <CollectionView.ItemTemplate>
+            <DataTemplate x:DataType="local:DateSchedule">
+                <Grid RowDefinitions="auto, *">
+                    <!--Дата-->
+                    <Label Text="{Binding Date, StringFormat='{0:dd MMMM, dddd}'}" 
                                FontAttributes="Bold" 
                                Margin="10,5"
                                Grid.Row="0"/>
 
-                        <!--Расписание на дату-->
-                        <CollectionView ItemsSource="{Binding Courses}" 
+                    <!--Расписание на дату-->
+                    <CollectionView ItemsSource="{Binding Courses}" 
                                         Grid.Row="1" 
                                         Margin="10,25"
                                         ItemTemplate="{StaticResource CourseTemlate}">
-                        </CollectionView>
-                    </Grid>
-                </DataTemplate>
-            </CollectionView.ItemTemplate>
-        </CollectionView>
-    </ScrollView>
+                    </CollectionView>
+                </Grid>
+            </DataTemplate>
+        </CollectionView.ItemTemplate>
+    </CollectionView>
 
 </ContentPage>
