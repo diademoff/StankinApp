@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.13.35825.156 d17.13
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StankinAppDatabase", "StankinAppDatabase\StankinAppDatabase.csproj", "{8E4550B7-652C-4D21-84A5-8937E541E0F4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "StankinAppDatabase.Tests", "StankinAppDatabase.Tests\StankinAppDatabase.Tests.csproj", "{07BBF29C-7264-4911-AD23-240C80142437}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{8E4550B7-652C-4D21-84A5-8937E541E0F4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8E4550B7-652C-4D21-84A5-8937E541E0F4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8E4550B7-652C-4D21-84A5-8937E541E0F4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8E4550B7-652C-4D21-84A5-8937E541E0F4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{07BBF29C-7264-4911-AD23-240C80142437}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{07BBF29C-7264-4911-AD23-240C80142437}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{07BBF29C-7264-4911-AD23-240C80142437}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{07BBF29C-7264-4911-AD23-240C80142437}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {82A9820E-F1F4-4235-A1C6-55B2E2AC9EC0}
+	EndGlobalSection
+EndGlobal
