@@ -11,10 +11,10 @@ namespace StankinAppDatabase
         private readonly string _dbPath;
         private readonly ScheduleJsonReader _scheduleReader;
 
-        public DatabaseBuilder(string dbPath = "schedule.db")
+        public DatabaseBuilder(int currentYear, string dbPath = "schedule.db")
         {
             _dbPath = dbPath;
-            _scheduleReader = new ScheduleJsonReader();
+            _scheduleReader = new ScheduleJsonReader(currentYear);
         }
 
         public void CreateSchema()
@@ -75,7 +75,7 @@ namespace StankinAppDatabase
                 );";
             command.ExecuteNonQuery();
 
-            // schedule_dates table, year не важен, храним только dd.MM
+            // schedule_dates table, year пїЅпїЅ пїЅпїЅпїЅпїЅпїЅ, пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ dd.MM
             command.CommandText = @"
                 CREATE TABLE IF NOT EXISTS schedule_dates (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -109,26 +109,28 @@ namespace StankinAppDatabase
             using var connection = new SqliteConnection($"Data Source={_dbPath}");
             connection.Open();
 
-            // Группа
+            // пїЅпїЅпїЅпїЅпїЅпїЅ
             var groupId = GetOrCreate(connection, "groups", "name", groupName);
 
-            // Учителя и кабинеты
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅ пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ
             var teachers = schedule.Days.Select(c => c.Teacher).Distinct().ToList();
             var rooms = schedule.Days.Select(c => c.Cabinet).Where(c => !string.IsNullOrEmpty(c)).Distinct().ToList();
 
             var teacherIds = new Dictionary<string, long>();
             foreach (var teacher in teachers)
-                teacherIds[teacher] = GetOrCreate(connection, "teachers", "name", teacher);
+                if (teacher is not null)
+                    teacherIds[teacher] = GetOrCreate(connection, "teachers", "name", teacher);
 
             var roomIds = new Dictionary<string, long>();
             foreach (var room in rooms)
-                roomIds[room] = GetOrCreate(connection, "rooms", "name", room);
+                if (room is not null)
+                    roomIds[room] = GetOrCreate(connection, "rooms", "name", room);
 
-            // Курсы (уроки)
+            // пїЅпїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅ)
             foreach (var course in schedule.Days)
             {
                 using var command = connection.CreateCommand();
-                // создаем сессию урока
+                // пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅ
                 command.CommandText = @"
                     INSERT INTO sessions (group_id, start_time, end_time)
                     VALUES (@group_id, @start_time, @end_time);
@@ -140,7 +142,7 @@ namespace StankinAppDatabase
 
                 var sessionId = (long)command.ExecuteScalar();
 
-                // создаем урок
+                // пїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ
                 var teacherId = teacherIds[course.Teacher];
                 var roomId = !string.IsNullOrEmpty(course.Cabinet) ? roomIds[course.Cabinet] : (long?)null;
 
@@ -158,7 +160,7 @@ namespace StankinAppDatabase
 
                 var lessonId = (long)command.ExecuteScalar();
 
-                // вставляем даты (только dd.MM)
+                // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅ (пїЅпїЅпїЅпїЅпїЅпїЅ dd.MM)
                 command.CommandText = @"
                     INSERT INTO schedule_dates (lesson_id, date)
                     VALUES (@lesson_id, @date)";
@@ -231,7 +233,7 @@ namespace StankinAppDatabase
             Console.WriteLine("date = " + date.ToString("dd.MM", null));
 
             command.Parameters.AddWithValue("@groupName", groupName);
-            // используем формат dd.MM без года
+            // пїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅпїЅ пїЅпїЅпїЅпїЅпїЅпїЅ dd.MM пїЅпїЅпїЅ пїЅпїЅпїЅпїЅ
             command.Parameters.AddWithValue("@date", date.ToString("dd.MM", null));
 
             var s = command.CommandText.ToString();
@@ -255,7 +257,7 @@ namespace StankinAppDatabase
                     Duration = duration,
                     Subgroup = reader.IsDBNull(6) ? null : reader.GetString(6),
                     GroupName = reader.GetString(7),
-                    Dates = new List<LocalDate> { date }
+                    Dates = [date]
                 });
             }
 

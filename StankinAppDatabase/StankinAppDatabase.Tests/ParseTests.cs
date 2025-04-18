@@ -19,7 +19,7 @@ namespace StankinAppDatabase.Tests
         [SetUp]
         public void Setup()
         {
-            _reader = new ScheduleJsonReader();
+            _reader = new ScheduleJsonReader(2025);
             _time = new NodaTime.LocalTime(12, 20);
             _period = NodaTime.Period.FromTicks(1000);
             _group = "grp";
@@ -31,11 +31,14 @@ namespace StankinAppDatabase.Tests
             string input = "Компьютерная микроскопия. Шулепов А.В. лекции. 0309. [10.02-28.04 к.н.]";
             var output = _reader.ParseLessons(input, _time, _period, _group);
 
-            Assert.That("Компьютерная микроскопия" == output[0].Subject);
-            Assert.That("Шулепов А.В." == output[0].Teacher);
-            Assert.That("лекции" == output[0].Type);
-            Assert.That("0309" == output[0].Cabinet);
-            Assert.That(string.IsNullOrEmpty(output[0].Subgroup));
+            Assert.Multiple(() =>
+            {
+                Assert.That(output[0].Subject, Is.EqualTo("Компьютерная микроскопия"));
+                Assert.That(output[0].Teacher, Is.EqualTo("Шулепов А.В."));
+                Assert.That(output[0].Type, Is.EqualTo("лекции"));
+                Assert.That(output[0].Cabinet, Is.EqualTo("0309"));
+                Assert.That(string.IsNullOrEmpty(output[0].Subgroup));
+            });
         }
 
         [Test]
@@ -45,17 +48,20 @@ namespace StankinAppDatabase.Tests
                           "Разработка приложений для встраиваемых и мобильных устройств. Верещагин Н.М. лабораторные занятия. (Б). 214. [26.02-26.03 ч.н.]";
             var output = _reader.ParseLessons(input, _time, _period, _group);
 
-            Assert.That("Разработка приложений для встраиваемых и мобильных устройств" == output[0].Subject);
-            Assert.That("Верещагин Н.М." == output[0].Teacher);
-            Assert.That("лабораторные занятия" == output[0].Type);
-            Assert.That("214" == output[0].Cabinet);
-            Assert.That("А" == output[0].Subgroup);
+            Assert.Multiple(() =>
+            {
+                Assert.That(output[0].Subject, Is.EqualTo("Разработка приложений для встраиваемых и мобильных устройств"));
+                Assert.That(output[0].Teacher, Is.EqualTo("Верещагин Н.М."));
+                Assert.That(output[0].Type, Is.EqualTo("лабораторные занятия"));
+                Assert.That(output[0].Cabinet, Is.EqualTo("214"));
+                Assert.That(output[0].Subgroup, Is.EqualTo("А"));
 
-            Assert.That("Разработка приложений для встраиваемых и мобильных устройств" == output[1].Subject);
-            Assert.That("Верещагин Н.М." == output[1].Teacher);
-            Assert.That("лабораторные занятия" == output[1].Type);
-            Assert.That("214" == output[1].Cabinet);
-            Assert.That("Б" == output[1].Subgroup);
+                Assert.That(output[1].Subject, Is.EqualTo("Разработка приложений для встраиваемых и мобильных устройств"));
+                Assert.That(output[1].Teacher, Is.EqualTo("Верещагин Н.М."));
+                Assert.That(output[1].Type, Is.EqualTo("лабораторные занятия"));
+                Assert.That(output[1].Cabinet, Is.EqualTo("214"));
+                Assert.That(output[1].Subgroup, Is.EqualTo("Б"));
+            });
         }
 
         [Test]
@@ -65,17 +71,20 @@ namespace StankinAppDatabase.Tests
                           "Интеграция информационных систем и технологий. Тихомирова В.Д. лабораторные занятия. (Б). 249(б). [02.04-30.04 ч.н., 21.05]";
             var output = _reader.ParseLessons(input, _time, _period, _group);
 
-            Assert.That("Интеграция информационных систем и технологий" == output[0].Subject);
-            Assert.That("Тихомирова В.Д." == output[0].Teacher);
-            Assert.That("лабораторные занятия" == output[0].Type);
-            Assert.That("249(б)" == output[0].Cabinet);
-            Assert.That("А" == output[0].Subgroup);
+            Assert.Multiple(() =>
+            {
+                Assert.That(output[0].Subject, Is.EqualTo("Интеграция информационных систем и технологий"));
+                Assert.That(output[0].Teacher, Is.EqualTo("Тихомирова В.Д."));
+                Assert.That(output[0].Type, Is.EqualTo("лабораторные занятия"));
+                Assert.That(output[0].Cabinet, Is.EqualTo("249(б)"));
+                Assert.That(output[0].Subgroup, Is.EqualTo("А"));
 
-            Assert.That("Интеграция информационных систем и технологий" == output[1].Subject);
-            Assert.That("Тихомирова В.Д." == output[1].Teacher);
-            Assert.That("лабораторные занятия" == output[1].Type);
-            Assert.That("249(б)" == output[1].Cabinet);
-            Assert.That("Б" == output[1].Subgroup);
+                Assert.That(output[1].Subject, Is.EqualTo("Интеграция информационных систем и технологий"));
+                Assert.That(output[1].Teacher, Is.EqualTo("Тихомирова В.Д."));
+                Assert.That(output[1].Type, Is.EqualTo("лабораторные занятия"));
+                Assert.That(output[1].Cabinet, Is.EqualTo("249(б)"));
+                Assert.That(output[1].Subgroup, Is.EqualTo("Б"));
+            });
         }
 
         [Test]
@@ -84,11 +93,14 @@ namespace StankinAppDatabase.Tests
             string input = "Экономика и управление машиностроительным производством. Гайбу В. . семинар. . [21.02-28.03 к.н.]";
             var output = _reader.ParseLessons(input, _time, _period, _group);
 
-            Assert.That("Экономика и управление машиностроительным производством" == output[0].Subject);
-            Assert.That("Гайбу В." == output[0].Teacher);
-            Assert.That("семинар" == output[0].Type);
-            Assert.That(string.IsNullOrEmpty(output[0].Cabinet));
-            Assert.That(string.IsNullOrEmpty(output[0].Subgroup));
+            Assert.Multiple(() =>
+            {
+                Assert.That(output[0].Subject, Is.EqualTo("Экономика и управление машиностроительным производством"));
+                Assert.That(output[0].Teacher, Is.EqualTo("Гайбу В."));
+                Assert.That(output[0].Type, Is.EqualTo("семинар"));
+                Assert.That(string.IsNullOrEmpty(output[0].Cabinet));
+                Assert.That(string.IsNullOrEmpty(output[0].Subgroup));
+            });
         }
 
         [Test]
@@ -98,17 +110,20 @@ namespace StankinAppDatabase.Tests
                           "Информатика. Кобец Е. . лабораторные занятия. (Б). 210. [28.03-25.04 ч.н., 23.05, 06.06]";
             var output = _reader.ParseLessons(input, _time, _period, _group);
 
-            Assert.That("Информатика" == output[0].Subject);
-            Assert.That("Кобец Е." == output[0].Teacher);
-            Assert.That("лабораторные занятия" == output[0].Type);
-            Assert.That("210" == output[0].Cabinet);
-            Assert.That("А" == output[0].Subgroup);
+            Assert.Multiple(() =>
+            {
+                Assert.That(output[0].Subject, Is.EqualTo("Информатика"));
+                Assert.That(output[0].Teacher, Is.EqualTo("Кобец Е."));
+                Assert.That(output[0].Type, Is.EqualTo("лабораторные занятия"));
+                Assert.That(output[0].Cabinet, Is.EqualTo("210"));
+                Assert.That(output[0].Subgroup, Is.EqualTo("А"));
 
-            Assert.That("Информатика" == output[1].Subject);
-            Assert.That("Кобец Е." == output[1].Teacher);
-            Assert.That("лабораторные занятия" == output[1].Type);
-            Assert.That("210" == output[1].Cabinet);
-            Assert.That("Б" == output[1].Subgroup);
+                Assert.That(output[1].Subject, Is.EqualTo("Информатика"));
+                Assert.That(output[1].Teacher, Is.EqualTo("Кобец Е."));
+                Assert.That(output[1].Type, Is.EqualTo("лабораторные занятия"));
+                Assert.That(output[1].Cabinet, Is.EqualTo("210"));
+                Assert.That(output[1].Subgroup, Is.EqualTo("Б"));
+            });
         }
 
         [Test]
@@ -117,11 +132,14 @@ namespace StankinAppDatabase.Tests
             string input = "Введение в проектную деятельность: технологическое и социальное проектирование. Амир Абдаллах Д. А.  . . семинар. 443. [19.02-07.05 к.н.]";
             var output = _reader.ParseLessons(input, _time, _period, _group);
 
-            Assert.That("Введение в проектную деятельность: технологическое и социальное проектирование" == output[0].Subject);
-            Assert.That("Амир Абдаллах Д. А." == output[0].Teacher);
-            Assert.That("семинар" == output[0].Type);
-            Assert.That("443" == output[0].Cabinet);
-            Assert.That(string.IsNullOrEmpty(output[0].Subgroup));
+            Assert.Multiple(() =>
+            {
+                Assert.That(output[0].Subject, Is.EqualTo("Введение в проектную деятельность: технологическое и социальное проектирование"));
+                Assert.That(output[0].Teacher, Is.EqualTo("Амир Абдаллах Д. А."));
+                Assert.That(output[0].Type, Is.EqualTo("семинар"));
+                Assert.That(output[0].Cabinet, Is.EqualTo("443"));
+                Assert.That(string.IsNullOrEmpty(output[0].Subgroup));
+            });
         }
 
         [Test]
@@ -130,11 +148,14 @@ namespace StankinAppDatabase.Tests
             string input = "Модели и методы теории вычислений. Агоштинью Адау Какулу . . семинар. . [01.03, 15.03-29.03 к.н.]";
             var output = _reader.ParseLessons(input, _time, _period, _group);
 
-            Assert.That("Модели и методы теории вычислений" == output[0].Subject);
-            Assert.That("Агоштинью Адау Какулу" == output[0].Teacher);
-            Assert.That("семинар" == output[0].Type);
-            Assert.That(string.IsNullOrEmpty(output[0].Cabinet));
-            Assert.That(string.IsNullOrEmpty(output[0].Subgroup));
+            Assert.Multiple(() =>
+            {
+                Assert.That(output[0].Subject, Is.EqualTo("Модели и методы теории вычислений"));
+                Assert.That(output[0].Teacher, Is.EqualTo("Агоштинью Адау Какулу"));
+                Assert.That(output[0].Type, Is.EqualTo("семинар"));
+                Assert.That(string.IsNullOrEmpty(output[0].Cabinet));
+                Assert.That(string.IsNullOrEmpty(output[0].Subgroup));
+            });
         }
 
         [Test]
@@ -146,29 +167,103 @@ namespace StankinAppDatabase.Tests
                           "Информатика. Кобец Е. . лабораторные занятия. (А). 214. [27.03-24.04 ч.н., 22.05, 05.06]";
             var output = _reader.ParseLessons(input, _time, _period, _group);
 
-            Assert.That("Физика" == output[0].Subject);
-            Assert.That("Аристархов П.В." == output[0].Teacher);
-            Assert.That("лабораторные занятия" == output[0].Type);
-            Assert.That("419" == output[0].Cabinet);
-            Assert.That("А" == output[0].Subgroup);
+            Assert.Multiple(() =>
+            {
+                Assert.That(output[0].Subject, Is.EqualTo("Физика"));
+                Assert.That(output[0].Teacher, Is.EqualTo("Аристархов П.В."));
+                Assert.That(output[0].Type, Is.EqualTo("лабораторные занятия"));
+                Assert.That(output[0].Cabinet, Is.EqualTo("419"));
+                Assert.That(output[0].Subgroup, Is.EqualTo("А"));
 
-            Assert.That("Физика" == output[1].Subject);
-            Assert.That("Аристархов П.В." == output[1].Teacher);
-            Assert.That("лабораторные занятия" == output[1].Type);
-            Assert.That("419" == output[1].Cabinet);
-            Assert.That("Б" == output[1].Subgroup);
+                Assert.That(output[1].Subject, Is.EqualTo("Физика"));
+                Assert.That(output[1].Teacher, Is.EqualTo("Аристархов П.В."));
+                Assert.That(output[1].Type, Is.EqualTo("лабораторные занятия"));
+                Assert.That(output[1].Cabinet, Is.EqualTo("419"));
+                Assert.That(output[1].Subgroup, Is.EqualTo("Б"));
 
-            Assert.That("Информатика" == output[2].Subject);
-            Assert.That("Кобец Е." == output[2].Teacher);
-            Assert.That("лабораторные занятия" == output[2].Type);
-            Assert.That("214" == output[2].Cabinet);
-            Assert.That("Б" == output[2].Subgroup);
+                Assert.That(output[2].Subject, Is.EqualTo("Информатика"));
+                Assert.That(output[2].Teacher, Is.EqualTo("Кобец Е."));
+                Assert.That(output[2].Type, Is.EqualTo("лабораторные занятия"));
+                Assert.That(output[2].Cabinet, Is.EqualTo("214"));
+                Assert.That(output[2].Subgroup, Is.EqualTo("Б"));
 
-            Assert.That("Информатика" == output[3].Subject);
-            Assert.That("Кобец Е." == output[3].Teacher);
-            Assert.That("лабораторные занятия" == output[3].Type);
-            Assert.That("214" == output[3].Cabinet);
-            Assert.That("А" == output[3].Subgroup);
+                Assert.That(output[3].Subject, Is.EqualTo("Информатика"));
+                Assert.That(output[3].Teacher, Is.EqualTo("Кобец Е."));
+                Assert.That(output[3].Type, Is.EqualTo("лабораторные занятия"));
+                Assert.That(output[3].Cabinet, Is.EqualTo("214"));
+                Assert.That(output[3].Subgroup, Is.EqualTo("А"));
+            });
+        }
+
+        [Test]
+        public void ParseDateTest1()
+        {
+            string input = "";
+            var output = _reader.ParseSchedule("10.02", 2025);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(output.Count, Is.EqualTo(1));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 02, 10)));
+            });
+        }
+
+        [Test]
+        public void ParseDateTest2()
+        {
+            string input = "";
+            var output = _reader.ParseSchedule("10.02, 13.02", 2025);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(output.Count(), Is.EqualTo(2));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 02, 10)));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 02, 13)));
+            });
+        }
+
+        [Test]
+        public void ParseDateTest3()
+        {
+            string input = "";
+            var output = _reader.ParseSchedule("10.02, 24.02-05.05 к.н.", 2025);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(output.Count(), Is.EqualTo(12));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 02, 10)));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 02, 24)));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 03, 03)));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 03, 10)));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 03, 17)));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 03, 24)));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 03, 31)));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 04, 07)));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 04, 14)));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 04, 21)));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 04, 28)));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 05, 05)));
+            });
+        }
+
+        [Test]
+        public void ParseDateTest4()
+        {
+            string input = "";
+            var output = _reader.ParseSchedule("15.02-15.03 ч.н., 22.03-19.04 к.н.", 2025);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(output.Count(), Is.EqualTo(8));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 02, 15)));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 03, 01)));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 03, 15)));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 03, 22)));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 03, 29)));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 04, 05)));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 04, 12)));
+                Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 04, 19)));
+            });
         }
     }
 }

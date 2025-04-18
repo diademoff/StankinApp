@@ -9,17 +9,19 @@ namespace StankinAppDatabase
     public class Course
     {
         public LocalTime StartTime { get; set; }
-        public Period Duration { get; set; }
-        public List<LocalDate> Dates { get; set; }
-        public string GroupName { get; set; }
-        public string Subject { get; set; }
-        public string Teacher { get; set; }
-        public string Type { get; set; }
-        public string Subgroup { get; set; }
-        public string Cabinet { get; set; }
+        public Period? Duration { get; set; }
+        public List<LocalDate>? Dates { get; set; }
+        public string? GroupName { get; set; }
+        public string? Subject { get; set; }
+        public string? Teacher { get; set; }
+        public string? Type { get; set; }
+        public string? Subgroup { get; set; }
+        public string? Cabinet { get; set; }
 
         public override string ToString()
         {
+            if (Duration is null || Dates is null)
+                throw new Exception("Course Duration or Dates is null");
             var endTime = StartTime + Duration;
             var dates = string.Join(", ", Dates.Select(d => d.ToString("dd.MM", null)));
             var subgroupInfo = !string.IsNullOrEmpty(Subgroup) ? $" ({Subgroup})" : "";
@@ -43,7 +45,13 @@ namespace StankinAppDatabase
     
     public class ScheduleJsonReader
     {
-        private static readonly HashSet<string> AllowedLessonTypes = new HashSet<string> { "лекции", "семинар", "лабораторные занятия" };
+        private static readonly HashSet<string> AllowedLessonTypes = ["лекции", "семинар", "лабораторные занятия"];
+        int currentYear;
+
+        public ScheduleJsonReader(int currentYear)
+        {
+            this.currentYear = currentYear;
+        }
 
         public Schedule GetSchedule(string groupName, string fileJson)
         {
@@ -115,7 +123,7 @@ namespace StankinAppDatabase
 
             if (matches == null) throw new ArgumentNullException();
 
-            List<Course> entries = new List<Course>();
+            List<Course> entries = [];
             foreach (Match match in matches)
             {
                 if (match.Success)
@@ -126,7 +134,7 @@ namespace StankinAppDatabase
                     var subgroup = match.Groups["subgroup"].Success ? match.Groups["subgroup"].Value.Trim() : "";
                     var cabinet = match.Groups["cabinet"].Value.Trim();
                     var datesString = match.Groups["dates"].Value.Trim();
-                    var dates = ParseSchedule(datesString) ?? throw new ArgumentNullException();
+                    var dates = ParseSchedule(datesString, currentYear) ?? throw new ArgumentNullException();
 
                     var entry = new Course
                     {
@@ -148,7 +156,7 @@ namespace StankinAppDatabase
             return entries;
         }
 
-        private List<LocalDate> ParseSchedule(string datesString)
+        public List<LocalDate> ParseSchedule(string datesString, int currentYear)
         {
             if (datesString.Contains(','))
             {
@@ -156,14 +164,14 @@ namespace StankinAppDatabase
                 var dates = new List<LocalDate>();
                 foreach (var date in subDates)
                 {
-                    dates.AddRange(ParseSchedule(date));
+                    dates.AddRange(ParseSchedule(date, currentYear));
                 }
                 return dates;
             }
 
             var dateSchedules = new List<LocalDate>();
 
-            var parts = datesString.Split(new char[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            var parts = datesString.Split([','], StringSplitOptions.RemoveEmptyEntries);
             foreach (var part in parts)
             {
                 var trimmed = part.Trim();
@@ -172,18 +180,18 @@ namespace StankinAppDatabase
                 if (match.Success)
                 {
                     var startStr = match.Groups["start"].Value;
-                    if (!LocalDatePattern.CreateWithInvariantCulture("dd.MM").Parse(startStr).TryGetValue(new LocalDate(2000, 1, 1), out var startDate))
+                    if (!LocalDatePattern.CreateWithInvariantCulture("dd.MM").Parse(startStr).TryGetValue(new LocalDate(currentYear, 1, 1), out var startDate))
                         throw new RegexMatchTimeoutException("не удалось спарсить дату start");
 
-                    startDate = new LocalDate(2000, startDate.Month, startDate.Day);
+                    startDate = new LocalDate(currentYear, startDate.Month, startDate.Day);
 
                     LocalDate? endDate = null;
                     if (match.Groups["end"].Success && !string.IsNullOrEmpty(match.Groups["end"].Value))
                     {
                         var endStr = match.Groups["end"].Value;
-                        if (LocalDatePattern.CreateWithInvariantCulture("dd.MM").Parse(endStr).TryGetValue(new LocalDate(2000, 1, 1), out var parsedEnd))
+                        if (LocalDatePattern.CreateWithInvariantCulture("dd.MM").Parse(endStr).TryGetValue(new LocalDate(currentYear, 1, 1), out var parsedEnd))
                         {
-                            endDate = new LocalDate(2000, parsedEnd.Month, parsedEnd.Day);
+                            endDate = new LocalDate(currentYear, parsedEnd.Month, parsedEnd.Day);
                         }
                         else
                         {
