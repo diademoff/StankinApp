@@ -215,7 +215,10 @@ namespace StankinAppDatabase
             }
 
             if (courses.Count == 0)
+            {
+                _scheduleListView.SetSource(new List<string>());
                 return;
+            }    
 
             var (subjectWidth, typeWidth, groupWidth, subgroupWidth) = CalculateColumnWidths(courses);
 
@@ -224,14 +227,14 @@ namespace StankinAppDatabase
                 _isRoomSelected 
                     ? string.Format("{0}-{1}  {2,-" + subjectWidth + "} {3,-" + typeWidth + "}  {4,-" + groupWidth + "} {5}",
                         timePattern.Format(c.StartTime), timePattern.Format(c.StartTime.Plus(c.Duration)),
-                        c.Subject, c.Type, c.GroupName, c.Subgroup)
+                        c.Subject, c.Type, c.GroupName, c.Subgroup ?? "")
                     : _isTeacherSelected
                         ? string.Format("{0}-{1}  {2,-" + subjectWidth + "} {3,-" + typeWidth + "}  {4,-" + groupWidth + "} {5,-" + subgroupWidth + "} {6}",
                         timePattern.Format(c.StartTime), timePattern.Format(c.StartTime.Plus(c.Duration)),
-                        c.Subject, c.Type, c.GroupName, c.Subgroup, c.Cabinet ?? "дист.")
-                        : string.Format("{0}-{1}  {2,-" + subjectWidth + "} {3,-" + typeWidth + "}  {4}",
+                        c.Subject, c.Type, c.GroupName, c.Subgroup ?? "", c.Cabinet ?? "дист.")
+                        : string.Format("{0}-{1}  {2,-" + subjectWidth + "} {3,-" + typeWidth + "}  {4,-" + groupWidth + "} {5}",
                         timePattern.Format(c.StartTime), timePattern.Format(c.StartTime.Plus(c.Duration)),
-                        c.Subject, c.Type, c.Cabinet ?? "дист.")).ToList();
+                        c.Subject, c.Type, c.Cabinet ?? "дист.", c.Subgroup ?? "")).ToList();
 
             _scheduleListView.SetSource(scheduleItems);
         }
