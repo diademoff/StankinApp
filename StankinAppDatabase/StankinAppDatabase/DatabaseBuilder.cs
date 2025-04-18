@@ -311,5 +311,21 @@ namespace StankinAppDatabase
 
             return courses;
         }
+
+        public List<string> GetRooms()
+        {
+            var rooms = new List<string>();
+            using var connection = new SqliteConnection($"Data Source={_dbPath}");
+            connection.Open();
+
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT name FROM rooms ORDER BY name";
+
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                rooms.Add(reader.GetString(0));
+
+            return rooms;
+        }
     }
 } 
