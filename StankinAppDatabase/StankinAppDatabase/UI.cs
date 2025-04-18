@@ -1,5 +1,6 @@
 using Terminal.Gui;
 using NodaTime;
+using NodaTime.Text;
 
 namespace StankinAppDatabase
 {
@@ -16,6 +17,9 @@ namespace StankinAppDatabase
         private TabView _tabView;
         private ListView _roomsListView;
         private bool _isRoomSelected;
+        private List<string> _teachers;
+        private ListView _teachersListView;
+        private bool _isTeacherSelected;
 
         public UI(DatabaseBuilder builder)
         {
@@ -50,7 +54,7 @@ namespace StankinAppDatabase
             {
                 X = 0,
                 Y = 0,
-                Width = 30,
+                Width = 50,
                 Height = Dim.Fill(1)
             };
 
@@ -103,6 +107,26 @@ namespace StankinAppDatabase
                 Console.WriteLine($"Ошибка загрузки кабинетов: {ex.Message}");
             }
 
+            // Вкладка "Преподаватели"
+            try
+            {
+                _teachers = _builder.GetTeachers();
+                var teachersListView = new ListView
+                {
+                    Width = Dim.Fill(),
+                    Height = Dim.Fill()
+                };
+                teachersListView.SetSource(_teachers);
+                var teachersTab = new TabView.Tab("Преподаватели", teachersListView);
+                _teachersListView = teachersListView;
+                _teachersListView.SelectedItemChanged += OnTeacherSelected;
+                _tabView.AddTab(teachersTab, false);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Ошибка загрузки преподавателей: {ex.Message}");
+            }
+
             leftPanel.Add(_tabView);
 
             // Правая панель
@@ -145,12 +169,21 @@ namespace StankinAppDatabase
         private void OnRoomSelected(ListViewItemEventArgs args)
         {
             _isRoomSelected = true;
+            _isTeacherSelected = false;
+            UpdateSchedule();
+        }
+
+        private void OnTeacherSelected(ListViewItemEventArgs args)
+        {
+            _isRoomSelected = false;
+            _isTeacherSelected = true;
             UpdateSchedule();
         }
 
         private void OnGroupSelected(ListViewItemEventArgs args)
         {
             _isRoomSelected = false;
+            _isTeacherSelected = false;
             UpdateSchedule();
         }
 
@@ -159,7 +192,14 @@ namespace StankinAppDatabase
             if (_tabView.SelectedTab == null) return;
 
             List<Course> courses;
-            if (!_isRoomSelected)
+            if (_isTeacherSelected)
+            {
+                if (_teachersListView.SelectedItem == -1) return;
+                var selectedTeacher = _teachers[_teachersListView.SelectedItem];
+                var localDate = new LocalDate(_dateField.Date.Year, _dateField.Date.Month, _dateField.Date.Day);
+                courses = _builder.GetScheduleForTeacher(selectedTeacher, localDate);
+            }
+            else if (!_isRoomSelected)
             {
                 if (_groupsListView.SelectedItem == -1) return;
                 var selectedGroup = _groups[_groupsListView.SelectedItem];
@@ -174,12 +214,42 @@ namespace StankinAppDatabase
                 courses = _builder.GetScheduleForRoom(selectedRoom, localDate);
             }
 
+            if (courses.Count == 0)
+                return;
+
+            var (subjectWidth, typeWidth, groupWidth, subgroupWidth) = CalculateColumnWidths(courses);
+
+            var timePattern = LocalTimePattern.CreateWithInvariantCulture("HH:mm");
             var scheduleItems = courses.Select(c =>
                 _isRoomSelected 
-                    ? $"{c.StartTime:HH:mm}-{c.StartTime.Plus(c.Duration):HH:mm} {c.Subject} ({c.Type}) {c.GroupName} {c.Subgroup}"
-                    : $"{c.StartTime:HH:mm}-{c.StartTime.Plus(c.Duration):HH:mm} {c.Subject} ({c.Type}) {c.Cabinet ?? "дист."}").ToList();
+                    ? string.Format("{0}-{1}  {2,-" + subjectWidth + "} {3,-" + typeWidth + "}  {4,-" + groupWidth + "} {5}",
+                        timePattern.Format(c.StartTime), timePattern.Format(c.StartTime.Plus(c.Duration)),
+                        c.Subject, c.Type, c.GroupName, c.Subgroup)
+                    : _isTeacherSelected
+                        ? string.Format("{0}-{1}  {2,-" + subjectWidth + "} {3,-" + typeWidth + "}  {4,-" + groupWidth + "} {5,-" + subgroupWidth + "} {6}",
+                        timePattern.Format(c.StartTime), timePattern.Format(c.StartTime.Plus(c.Duration)),
+                        c.Subject, c.Type, c.GroupName, c.Subgroup, c.Cabinet ?? "дист.")
+                        : string.Format("{0}-{1}  {2,-" + subjectWidth + "} {3,-" + typeWidth + "}  {4}",
+                        timePattern.Format(c.StartTime), timePattern.Format(c.StartTime.Plus(c.Duration)),
+                        c.Subject, c.Type, c.Cabinet ?? "дист.")).ToList();
 
             _scheduleListView.SetSource(scheduleItems);
+        }
+
+        private (int subjectWidth, int typeWidth, int groupWidth, int subgroupWidth) CalculateColumnWidths(List<Course> courses)
+        {
+            var subjectWidth = Math.Max(30, courses.Max(c => c.Subject?.Length ?? 0));
+            var typeWidth = Math.Max(10, courses.Max(c => c.Type?.Length ?? 0));
+            var groupWidth = Math.Max(10, courses.Max(c => c.GroupName?.Length ?? 0));
+            var subgroupWidth = Math.Max(5, courses.Max(c => c.Subgroup?.Length ?? 0));
+
+            // Add some padding to each column
+            subjectWidth += 2;
+            typeWidth += 2;
+            groupWidth += 2;
+            subgroupWidth += 2;
+
+            return (subjectWidth, typeWidth, groupWidth, subgroupWidth);
         }
     }
 } 
