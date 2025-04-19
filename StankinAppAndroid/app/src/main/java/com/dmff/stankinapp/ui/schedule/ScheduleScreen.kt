@@ -2,7 +2,9 @@ package com.dmff.stankinapp.ui.schedule
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
@@ -20,11 +22,23 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun ScheduleScreen(
     groupName: String,
-    schedule: List<Course>,
+    schedule: Map<LocalDate, List<Course>>,
+    currentDate: LocalDate,
     onDateChange: (LocalDate) -> Unit,
     onNavigateBack: () -> Unit
 ) {
-    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    val listState = rememberLazyListState()
+    
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .collect { index ->
+                if (index == 0) {
+                    onDateChange(currentDate.minusDays(7))
+                } else if (index == schedule.size - 1) {
+                    onDateChange(currentDate.plusDays(7))
+                }
+            }
+    }
 
     Scaffold(
         topBar = {
@@ -50,7 +64,7 @@ fun ScheduleScreen(
                     .padding(padding),
                 contentAlignment = Alignment.Center
             ) {
-                Text("No classes scheduled for this day")
+                Text("No schedule available")
             }
         } else {
             LazyColumn(
@@ -58,11 +72,36 @@ fun ScheduleScreen(
                     .fillMaxSize()
                     .padding(padding)
                     .padding(horizontal = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                state = listState,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(schedule) { course ->
-                    ScheduleCard(course = course)
+                items(schedule.entries.toList()) { (date, courses) ->
+                    DaySchedule(date, courses)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+fun DaySchedule(date: LocalDate, courses: List<Course>) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(
+            text = date.format(DateTimeFormatter.ofPattern("EEEE, d MMMM")),
+            style = MaterialTheme.typography.titleLarge
+        )
+        
+        if (courses.isEmpty()) {
+            Text(
+                text = "No classes scheduled",
+                style = MaterialTheme.typography.bodyMedium
+            )
+        } else {
+            courses.forEach { course ->
+                ScheduleCard(course = course)
             }
         }
     }
@@ -135,4 +174,4 @@ fun ScheduleCard(course: Course) {
             }
         }
     }
-} 
+}

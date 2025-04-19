@@ -130,8 +130,23 @@ class ScheduleDatabase(context: Context) : SQLiteOpenHelper(context, "schedule.d
     private fun checkDatabaseConnection() {
         val dbFile = appContext.getDatabasePath(DATABASE_NAME)
         if (!dbFile.exists()) {
-            Log.e("ScheduleDatabase", "Database file not found at ${dbFile.absolutePath}")
-            throw IllegalStateException("База данных не найдена")
+            Log.d("ScheduleDatabase", "Database file not found, copying from assets...")
+            try {
+                // Create parent directories if they don't exist
+                dbFile.parentFile?.mkdirs()
+                
+                // Copy database from assets
+                val inputStream = appContext.assets.open(DATABASE_NAME)
+                val outputStream = java.io.FileOutputStream(dbFile)
+                inputStream.copyTo(outputStream)
+                inputStream.close()
+                outputStream.close()
+                
+                Log.d("ScheduleDatabase", "Database copied successfully from assets")
+            } catch (e: Exception) {
+                Log.e("ScheduleDatabase", "Error copying database from assets: ${e.message}", e)
+                throw IllegalStateException("Ошибка копирования базы данных из assets: ${e.message}")
+            }
         }
 
         val fileSize = dbFile.length()

@@ -28,17 +28,23 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    var schedule by remember { mutableStateOf<List<Course>>(emptyList()) }
+                    var schedule by remember { mutableStateOf<Map<LocalDate, List<Course>>>(emptyMap()) }
+                    var currentDate by remember { mutableStateOf(LocalDate.now()) }
                     
-                    LaunchedEffect(Unit) {
-                        schedule = database.getScheduleForGroup("АДБ-23-07", LocalDate.now())
+                    LaunchedEffect(currentDate) {
+                        val dates = (-7..7).map { currentDate.plusDays(it.toLong()) }
+                        val newSchedule = dates.associateWith { date ->
+                            database.getScheduleForGroup("АДБ-23-07", date)
+                        }
+                        schedule = newSchedule
                     }
                     
                     ScheduleScreen(
                         groupName = "АДБ-23-07",
                         schedule = schedule,
+                        currentDate = currentDate,
                         onDateChange = { newDate ->
-                            schedule = database.getScheduleForGroup("АДБ-23-07", newDate)
+                            currentDate = newDate
                         },
                         onNavigateBack = { finish() }
                     )
