@@ -9,11 +9,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import com.dmff.stankinapp.data.db.DatabaseBuilder
+import com.dmff.stankinapp.data.db.ScheduleDatabase
 import com.dmff.stankinapp.data.model.Course
 import com.dmff.stankinapp.ui.schedule.ScheduleScreen
 import com.dmff.stankinapp.ui.theme.StankinAppTheme
-import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 class MainActivity : ComponentActivity() {
@@ -21,7 +20,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
-        val databaseBuilder = DatabaseBuilder(this)
+        val database = ScheduleDatabase(this)
         
         setContent {
             StankinAppTheme {
@@ -30,21 +29,16 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     var schedule by remember { mutableStateOf<List<Course>>(emptyList()) }
-                    val scope = rememberCoroutineScope()
                     
                     LaunchedEffect(Unit) {
-                        scope.launch {
-                            schedule = databaseBuilder.getScheduleForGroup("YOUR_GROUP_NAME", LocalDate.now())
-                        }
+                        schedule = database.getScheduleForGroup("АДБ-23-07", LocalDate.now())
                     }
                     
                     ScheduleScreen(
-                        groupName = "YOUR_GROUP_NAME",
+                        groupName = "АДБ-23-07",
                         schedule = schedule,
                         onDateChange = { newDate ->
-                            scope.launch {
-                                schedule = databaseBuilder.getScheduleForGroup("YOUR_GROUP_NAME", newDate)
-                            }
+                            schedule = database.getScheduleForGroup("АДБ-23-07", newDate)
                         },
                         onNavigateBack = { finish() }
                     )
