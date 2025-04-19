@@ -1,5 +1,7 @@
 package com.dmff.stankinapp.ui.schedule
 
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -111,80 +113,83 @@ fun DaySchedule(date: LocalDate, courses: List<Course>) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduleCard(course: Course) {
-    var fontSize by remember { mutableStateOf(22.sp) }
-    var lineHeight by remember { mutableStateOf(28.sp) }
-    
     Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .animateContentSize(animationSpec = tween(durationMillis = 250)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        shape = MaterialTheme.shapes.medium,
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
-        Column(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Subject
-            Text(
-                text = course.subject ?: "",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontSize = fontSize,
-                    lineHeight = lineHeight
-                ),
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                softWrap = true,
-                onTextLayout = { textLayoutResult ->
-                    if (textLayoutResult.didOverflowHeight && fontSize > 16.sp) {
-                        fontSize = fontSize * 0.9f
-                        lineHeight = fontSize * 1.2f
-                    }
-                }
-            )
-
-            // Time
-            Column {
+            // time block
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.width(64.dp)
+            ) {
                 Text(
                     text = course.startTime.format(DateTimeFormatter.ofPattern("HH:mm")),
-                    style = MaterialTheme.typography.titleMedium
+                    style = MaterialTheme.typography.labelLarge
                 )
                 Text(
-                    text = course.startTime.plus(course.duration!!).format(DateTimeFormatter.ofPattern("HH:mm")),
-                    style = MaterialTheme.typography.titleMedium
+                    text = course.startTime
+                        .plus(course.duration!!)
+                        .format(DateTimeFormatter.ofPattern("HH:mm")),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
-            // Type and subgroup
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
+            // info block
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.weight(1f)
             ) {
                 Text(
-                    text = course.type ?: "",
-                    style = MaterialTheme.typography.bodyMedium
+                    text = course.subject.orEmpty(),
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
-                if (!course.subgroup.isNullOrEmpty()) {
-                    Text(
-                        text = course.subgroup,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (!course.type.isNullOrEmpty()) {
+                        Text(
+                            text = course.type,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    if (!course.subgroup.isNullOrEmpty()) {
+                        Text(
+                            text = "п/г ${course.subgroup}",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
-            }
 
-            // Teacher and room
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = course.teacher ?: "",
-                    style = MaterialTheme.typography.bodyMedium
-                )
-                if (!course.cabinet.isNullOrEmpty()) {
-                    Text(
-                        text = course.cabinet,
-                        style = MaterialTheme.typography.bodyMedium
-                    )
+                Row(
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (!course.teacher.isNullOrEmpty()) {
+                        Text(
+                            text = course.teacher,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    if (!course.cabinet.isNullOrEmpty()) {
+                        Text(
+                            text = course.cabinet,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                 }
             }
         }
