@@ -14,6 +14,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.dmff.stankinapp.data.model.Course
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -110,6 +111,9 @@ fun DaySchedule(date: LocalDate, courses: List<Course>) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduleCard(course: Course) {
+    var fontSize by remember { mutableStateOf(22.sp) }
+    var lineHeight by remember { mutableStateOf(28.sp) }
+    
     Card(
         modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
@@ -120,22 +124,33 @@ fun ScheduleCard(course: Course) {
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Time and subject
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            // Subject
+            Text(
+                text = course.subject ?: "",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontSize = fontSize,
+                    lineHeight = lineHeight
+                ),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                softWrap = true,
+                onTextLayout = { textLayoutResult ->
+                    if (textLayoutResult.didOverflowHeight && fontSize > 16.sp) {
+                        fontSize = fontSize * 0.9f
+                        lineHeight = fontSize * 1.2f
+                    }
+                }
+            )
+
+            // Time
+            Column {
                 Text(
-                    text = "${course.startTime.format(DateTimeFormatter.ofPattern("HH:mm"))} - " +
-                           "${course.startTime.plus(course.duration!!).format(DateTimeFormatter.ofPattern("HH:mm"))}",
+                    text = course.startTime.format(DateTimeFormatter.ofPattern("HH:mm")),
                     style = MaterialTheme.typography.titleMedium
                 )
                 Text(
-                    text = course.subject ?: "",
-                    style = MaterialTheme.typography.titleLarge,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    text = course.startTime.plus(course.duration!!).format(DateTimeFormatter.ofPattern("HH:mm")),
+                    style = MaterialTheme.typography.titleMedium
                 )
             }
 
@@ -150,7 +165,7 @@ fun ScheduleCard(course: Course) {
                 )
                 if (!course.subgroup.isNullOrEmpty()) {
                     Text(
-                        text = "Subgroup ${course.subgroup}",
+                        text = course.subgroup,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -167,7 +182,7 @@ fun ScheduleCard(course: Course) {
                 )
                 if (!course.cabinet.isNullOrEmpty()) {
                     Text(
-                        text = "Room ${course.cabinet}",
+                        text = course.cabinet,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
