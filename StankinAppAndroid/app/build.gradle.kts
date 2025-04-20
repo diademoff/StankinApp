@@ -56,6 +56,9 @@ dependencies {
     implementation("androidx.compose.runtime:runtime-livedata:1.6.1")
     implementation("androidx.compose.runtime:runtime-saveable:1.6.1")
 
+    // Preferences
+    implementation("androidx.datastore:datastore-preferences:1.0.0")
+
     // Core Android
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
