@@ -156,8 +156,7 @@ fun DaySchedule(date: LocalDate, courses: List<Course>) {
 fun ScheduleCard(course: Course) {
     Card(
         modifier = Modifier
-            .fillMaxWidth()
-            .animateContentSize(animationSpec = tween(durationMillis = 250)),
+            .fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
