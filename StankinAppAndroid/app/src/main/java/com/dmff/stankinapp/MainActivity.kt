@@ -19,32 +19,42 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        
+
         val database = ScheduleDatabase(this)
-        
+
         setContent {
             StankinAppTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    var schedule by remember { mutableStateOf<Map<LocalDate, List<Course>>>(emptyMap()) }
-                    var currentDate by remember { mutableStateOf(LocalDate.now()) }
-                    
-                    LaunchedEffect(currentDate) {
-                        val dates = (-7..7).map { currentDate.plusDays(it.toLong()) }
-                        val newSchedule = dates.associateWith { date ->
-                            database.getScheduleForGroup("АДБ-23-07", date)
+                    val schedule = remember { mutableStateMapOf<LocalDate, List<Course>>() }
+                    val loadedDates = remember { mutableStateOf(mutableSetOf<LocalDate>()) }
+                    val listStartDate = remember { mutableStateOf(LocalDate.now().minusDays(7)) }
+                    val listEndDate = remember { mutableStateOf(LocalDate.now().plusDays(7)) }
+                    val currentDate = remember { mutableStateOf(LocalDate.now()) }
+
+                    LaunchedEffect(listStartDate.value, listEndDate.value) {
+                        for (date in listStartDate.value..listEndDate.value) {
+                            if (date !in loadedDates.value) {
+                                loadedDates.value.add(date)
+                                val courses = database.getScheduleForGroup("АДБ-23-07", date)
+                                schedule[date] = courses
+                            }
                         }
-                        schedule = newSchedule
                     }
-                    
+
                     ScheduleScreen(
                         groupName = "АДБ-23-07",
-                        schedule = schedule,
-                        currentDate = currentDate,
-                        onDateChange = { newDate ->
-                            currentDate = newDate
+                        schedule = schedule.toMap(),
+                        currentDate = currentDate.value,
+                        onDateChange = { newDate -> currentDate.value = newDate },
+                        onLoadMore = { date, isStart ->
+                            if (isStart) {
+                                listStartDate.value = date
+                            } else {
+                                listEndDate.value = date
+                            }
                         },
                         onNavigateBack = { finish() }
                     )
@@ -53,3 +63,8 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
+
+// helper for LocalDate range
+operator fun ClosedRange<LocalDate>.iterator() = generateSequence(start) { it.plusDays(1) }
+    .takeWhile { it <= endInclusive }
+    .iterator()

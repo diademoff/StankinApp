@@ -4,7 +4,6 @@ import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -16,7 +15,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.dmff.stankinapp.data.model.Course
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -28,17 +26,29 @@ fun ScheduleScreen(
     schedule: Map<LocalDate, List<Course>>,
     currentDate: LocalDate,
     onDateChange: (LocalDate) -> Unit,
+    onLoadMore: (LocalDate, isStart: Boolean) -> Unit,
     onNavigateBack: () -> Unit
 ) {
     val listState = rememberLazyListState()
-    
+
     LaunchedEffect(listState) {
-        snapshotFlow { listState.firstVisibleItemIndex }
-            .collect { index ->
-                if (index == 0) {
-                    onDateChange(currentDate.minusDays(7))
-                } else if (index == schedule.size - 1) {
-                    onDateChange(currentDate.plusDays(7))
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo }
+            .collect { visibleItems ->
+                if (visibleItems.isNotEmpty()) {
+                    val firstDate = schedule.keys.minOrNull() ?: return@collect
+                    val lastDate = schedule.keys.maxOrNull() ?: return@collect
+
+                    val topItem = visibleItems.first().index
+                    val bottomItem = visibleItems.last().index
+                    val totalCount = schedule.size
+
+                    if (topItem <= 3) {
+                        onLoadMore(firstDate.minusDays(7), true)
+                    }
+
+                    if (bottomItem >= totalCount - 3) {
+                        onLoadMore(lastDate.plusDays(7), false)
+                    }
                 }
             }
     }
@@ -70,6 +80,8 @@ fun ScheduleScreen(
                 Text("No schedule available")
             }
         } else {
+            val sortedSchedule = remember(schedule) { schedule.toSortedMap() }
+
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
@@ -78,7 +90,7 @@ fun ScheduleScreen(
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(schedule.entries.toList()) { (date, courses) ->
+                items(sortedSchedule.entries.toList()) { (date, courses) ->
                     DaySchedule(date, courses)
                 }
             }
@@ -96,7 +108,7 @@ fun DaySchedule(date: LocalDate, courses: List<Course>) {
             text = date.format(DateTimeFormatter.ofPattern("EEEE, d MMMM")),
             style = MaterialTheme.typography.titleLarge
         )
-        
+
         if (courses.isEmpty()) {
             Text(
                 text = "No classes scheduled",
@@ -128,7 +140,6 @@ fun ScheduleCard(course: Course) {
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // time block
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center,
@@ -147,7 +158,6 @@ fun ScheduleCard(course: Course) {
                 )
             }
 
-            // info block
             Column(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
                 modifier = Modifier.weight(1f)
