@@ -32,7 +32,7 @@ fun ScheduleScreen(
     val listState = rememberLazyListState()
     var initialScrollDone by remember { mutableStateOf(false) }
 
-    // Scroll to today's date when schedule is first loaded
+    // Прокручивание до сегодняшней даты при запуске
     LaunchedEffect(schedule) {
         if (!initialScrollDone && schedule.isNotEmpty()) {
             val sortedDates = schedule.keys.toList().sorted()
@@ -44,27 +44,35 @@ fun ScheduleScreen(
         }
     }
 
-    // Infinite scroll logic
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.layoutInfo.visibleItemsInfo }
-            .collect { visibleItems ->
-                if (visibleItems.isNotEmpty()) {
-                    val firstDate = schedule.keys.minOrNull() ?: return@collect
-                    val lastDate = schedule.keys.maxOrNull() ?: return@collect
+    // Логика для подгрузки данных при прокрутке
+    val sortedSchedule = remember(schedule) { schedule.toSortedMap() }
+    val totalCount = sortedSchedule.size
 
-                    val topItem = visibleItems.first().index
-                    val bottomItem = visibleItems.last().index
-                    val totalCount = schedule.size
+    val loadMoreAtStart by remember {
+        derivedStateOf {
+            listState.firstVisibleItemIndex <= 3
+        }
+    }
 
-                    if (topItem <= 3) {
-                        onLoadMore(firstDate.minusDays(7), true)
-                    }
+    val loadMoreAtEnd by remember {
+        derivedStateOf {
+            val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
+            lastVisibleIndex >= totalCount - 3
+        }
+    }
 
-                    if (bottomItem >= totalCount - 3) {
-                        onLoadMore(lastDate.plusDays(7), false)
-                    }
-                }
-            }
+    LaunchedEffect(loadMoreAtStart) {
+        if (loadMoreAtStart && totalCount > 0) {
+            val firstDate = sortedSchedule.keys.first()
+            onLoadMore(firstDate.minusDays(7), true)
+        }
+    }
+
+    LaunchedEffect(loadMoreAtEnd) {
+        if (loadMoreAtEnd && totalCount > 0) {
+            val lastDate = sortedSchedule.keys.last()
+            onLoadMore(lastDate.plusDays(7), false)
+        }
     }
 
     Scaffold(
@@ -94,8 +102,6 @@ fun ScheduleScreen(
                 Text("No schedule available")
             }
         } else {
-            val sortedSchedule = remember(schedule) { schedule.toSortedMap() }
-
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
