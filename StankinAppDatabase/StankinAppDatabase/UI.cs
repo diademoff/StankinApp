@@ -1,6 +1,7 @@
 using Terminal.Gui;
 using NodaTime;
 using NodaTime.Text;
+using System.Globalization;
 
 namespace StankinAppDatabase
 {
@@ -20,6 +21,7 @@ namespace StankinAppDatabase
         private List<string> _teachers;
         private ListView _teachersListView;
         private bool _isTeacherSelected;
+        private Label _dayOfWeekLabel;
 
         public UI(DatabaseBuilder builder)
         {
@@ -138,13 +140,52 @@ namespace StankinAppDatabase
                 Height = Dim.Fill()
             };
 
-            _dateField = new DateField(DateTime.Now)
+            // Кнопка "Предыдущий день"
+            var prevDayButton = new Button("<")
             {
                 X = 0,
                 Y = 0,
+            };
+            prevDayButton.Clicked += () =>
+            {
+                _dateField.Date = _dateField.Date.AddDays(-1);
+                UpdateDayOfWeekLabel();
+                UpdateSchedule();
+            };
+
+            // Поле ввода даты
+            _dateField = new DateField(DateTime.Now)
+            {
+                X = Pos.Right(prevDayButton) + 1,
+                Y = 0,
                 Width = 20
             };
-            _dateField.DateChanged += (args) => UpdateSchedule();
+            _dateField.DateChanged += (args) =>
+            {
+                UpdateDayOfWeekLabel();
+                UpdateSchedule();
+            };
+
+            // Кнопка "Следующий день"
+            var nextDayButton = new Button(">")
+            {
+                X = Pos.Right(_dateField) + 1,
+                Y = 0,
+            };
+            nextDayButton.Clicked += () =>
+            {
+                _dateField.Date = _dateField.Date.AddDays(1);
+                UpdateDayOfWeekLabel();
+                UpdateSchedule();
+            };
+
+            // Label для дня недели
+            _dayOfWeekLabel = new Label("")
+            {
+                X = Pos.Right(nextDayButton) + 1,
+                Y = 0,
+            };
+            UpdateDayOfWeekLabel();
 
             _scheduleListView = new ListView()
             {
@@ -154,11 +195,18 @@ namespace StankinAppDatabase
                 Height = Dim.Fill()
             };
 
-            scheduleFrame.Add(_dateField, _scheduleListView);
+            scheduleFrame.Add(prevDayButton, _dateField, nextDayButton, _dayOfWeekLabel, _scheduleListView);
             _mainWindow.Add(leftPanel, scheduleFrame);
             top.Add(menu, _mainWindow);
 
             Application.Run();
+        }
+
+        private void UpdateDayOfWeekLabel()
+        {
+            var culture = CultureInfo.CurrentCulture;
+            var dayOfWeek = culture.DateTimeFormat.GetDayName(_dateField.Date.DayOfWeek);
+            _dayOfWeekLabel.Text = dayOfWeek;
         }
 
         private void OnDateChanged(DateTimeEventArgs<DateTime> args)
@@ -218,23 +266,23 @@ namespace StankinAppDatabase
             {
                 _scheduleListView.SetSource(new List<string>());
                 return;
-            }    
+            }
 
             var (subjectWidth, typeWidth, groupWidth, subgroupWidth) = CalculateColumnWidths(courses);
 
             var timePattern = LocalTimePattern.CreateWithInvariantCulture("HH:mm");
             var scheduleItems = courses.Select(c =>
-                _isRoomSelected 
-                    ? string.Format("{0}-{1}  {2,-" + subjectWidth + "} {3,-" + typeWidth + "}  {4,-" + groupWidth + "} {5}",
+                _isRoomSelected
+                    ? string.Format("{0}-{1}  {2,-" + subjectWidth + "} {3,-" + typeWidth + "}  {4,-" + groupWidth + "} {5,-" + subgroupWidth + "} {6}",
                         timePattern.Format(c.StartTime), timePattern.Format(c.StartTime.Plus(c.Duration)),
-                        c.Subject, c.Type, c.GroupName, c.Subgroup ?? "")
+                        c.Subject, c.Type, c.GroupName, c.Subgroup ?? "", c.Teacher)
                     : _isTeacherSelected
                         ? string.Format("{0}-{1}  {2,-" + subjectWidth + "} {3,-" + typeWidth + "}  {4,-" + groupWidth + "} {5,-" + subgroupWidth + "} {6}",
                         timePattern.Format(c.StartTime), timePattern.Format(c.StartTime.Plus(c.Duration)),
                         c.Subject, c.Type, c.GroupName, c.Subgroup ?? "", c.Cabinet ?? "дист.")
-                        : string.Format("{0}-{1}  {2,-" + subjectWidth + "} {3,-" + typeWidth + "}  {4,-" + groupWidth + "} {5}",
+                        : string.Format("{0}-{1}  {2,-" + subjectWidth + "} {3,-" + typeWidth + "}  {4,-" + groupWidth + "} {5,-" + subgroupWidth + "} {6}",
                         timePattern.Format(c.StartTime), timePattern.Format(c.StartTime.Plus(c.Duration)),
-                        c.Subject, c.Type, c.Cabinet ?? "дист.", c.Subgroup ?? "")).ToList();
+                        c.Subject, c.Type, c.Cabinet ?? "дист.", c.Subgroup ?? "", c.Teacher)).ToList();
 
             _scheduleListView.SetSource(scheduleItems);
         }
@@ -255,4 +303,4 @@ namespace StankinAppDatabase
             return (subjectWidth, typeWidth, groupWidth, subgroupWidth);
         }
     }
-} 
+}
