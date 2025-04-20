@@ -18,6 +18,8 @@ import androidx.compose.ui.unit.dp
 import com.dmff.stankinapp.data.model.Course
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,31 +50,35 @@ fun ScheduleScreen(
     val sortedSchedule = remember(schedule) { schedule.toSortedMap() }
     val totalCount = sortedSchedule.size
 
-    val loadMoreAtStart by remember {
-        derivedStateOf {
-            listState.firstVisibleItemIndex <= 3
-        }
-    }
+    LaunchedEffect(listState, schedule) {
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo }
+            .filter { it.isNotEmpty() }
+            .distinctUntilChanged()
+            .collect { visibleItems ->
+                if (visibleItems.isNotEmpty() && sortedSchedule.isNotEmpty()) {
+                    val firstVisibleIndex = visibleItems.first().index
+                    val lastVisibleIndex = visibleItems.last().index
+                    val totalCount = sortedSchedule.size
 
-    val loadMoreAtEnd by remember {
-        derivedStateOf {
-            val lastVisibleIndex = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.index ?: 0
-            lastVisibleIndex >= totalCount - 3
-        }
-    }
+                    // Подгрузка при скролле вверх
+                    if (firstVisibleIndex <= 3) {
+                        val firstDate = sortedSchedule.keys.firstOrNull()
+                        if (firstDate != null) {
+                            onLoadMore(firstDate.minusDays(7), true)
+                        }
+                    }
 
-    LaunchedEffect(loadMoreAtStart) {
-        if (loadMoreAtStart && totalCount > 0) {
-            val firstDate = sortedSchedule.keys.first()
-            onLoadMore(firstDate.minusDays(7), true)
-        }
-    }
-
-    LaunchedEffect(loadMoreAtEnd) {
-        if (loadMoreAtEnd && totalCount > 0) {
-            val lastDate = sortedSchedule.keys.last()
-            onLoadMore(lastDate.plusDays(7), false)
-        }
+                    // Подгрузка при скролле вниз
+                    if (lastVisibleIndex >= totalCount - 3) {
+                        val lastDate = sortedSchedule.keys.lastOrNull()
+                        if (lastDate != null) {
+                            onLoadMore(lastDate.plusDays(7), false)
+                        }
+                    }
+                } else {
+                    println("visibleItems или sortedSchedule пусты")
+                }
+            }
     }
 
     Scaffold(
