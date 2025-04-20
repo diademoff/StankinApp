@@ -30,7 +30,21 @@ fun ScheduleScreen(
     onNavigateBack: () -> Unit
 ) {
     val listState = rememberLazyListState()
+    var initialScrollDone by remember { mutableStateOf(false) }
 
+    // Scroll to today's date when schedule is first loaded
+    LaunchedEffect(schedule) {
+        if (!initialScrollDone && schedule.isNotEmpty()) {
+            val sortedDates = schedule.keys.toList().sorted()
+            val index = sortedDates.indexOfFirst { it == currentDate }
+            if (index != -1) {
+                listState.scrollToItem(index)
+                initialScrollDone = true
+            }
+        }
+    }
+
+    // Infinite scroll logic
     LaunchedEffect(listState) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo }
             .collect { visibleItems ->
@@ -90,7 +104,10 @@ fun ScheduleScreen(
                 state = listState,
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(sortedSchedule.entries.toList()) { (date, courses) ->
+                items(
+                    items = sortedSchedule.entries.toList(),
+                    key = { it.key }
+                ) { (date, courses) ->
                     DaySchedule(date, courses)
                 }
             }
