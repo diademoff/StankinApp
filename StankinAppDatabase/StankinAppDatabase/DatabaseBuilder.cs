@@ -11,10 +11,10 @@ namespace StankinAppDatabase
         private readonly string _dbPath;
         private readonly ScheduleJsonReader _scheduleReader;
 
-        public DatabaseBuilder(int currentYear, string dbPath = "schedule.db")
+        public DatabaseBuilder(int currentYear, Func<ErrorParsingInfo, Course[]> parseError, string dbPath = "schedule.db")
         {
             _dbPath = dbPath;
-            _scheduleReader = new ScheduleJsonReader(currentYear);
+            _scheduleReader = new ScheduleJsonReader(currentYear, parseError);
         }
 
         public void CreateSchema()
@@ -75,7 +75,6 @@ namespace StankinAppDatabase
                 );";
             command.ExecuteNonQuery();
 
-            // schedule_dates table, year �� �����, ������ ������ dd.MM
             command.CommandText = @"
                 CREATE TABLE IF NOT EXISTS schedule_dates (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -109,10 +108,8 @@ namespace StankinAppDatabase
             using var connection = new SqliteConnection($"Data Source={_dbPath}");
             connection.Open();
 
-            // ������
             var groupId = GetOrCreate(connection, "groups", "name", groupName);
 
-            // ������� � ��������
             var teachers = schedule.Days.Select(c => c.Teacher).Distinct().ToList();
             var rooms = schedule.Days.Select(c => c.Cabinet).Where(c => !string.IsNullOrEmpty(c)).Distinct().ToList();
 
@@ -126,11 +123,9 @@ namespace StankinAppDatabase
                 if (room is not null)
                     roomIds[room] = GetOrCreate(connection, "rooms", "name", room);
 
-            // ����� (�����)
             foreach (var course in schedule.Days)
             {
                 using var command = connection.CreateCommand();
-                // ������� ������ �����
                 command.CommandText = @"
                     INSERT INTO sessions (group_id, start_time, end_time)
                     VALUES (@group_id, @start_time, @end_time);
@@ -142,7 +137,6 @@ namespace StankinAppDatabase
 
                 var sessionId = (long)command.ExecuteScalar();
 
-                // ������� ����
                 var teacherId = teacherIds[course.Teacher];
                 var roomId = !string.IsNullOrEmpty(course.Cabinet) ? roomIds[course.Cabinet] : (long?)null;
 
@@ -160,7 +154,6 @@ namespace StankinAppDatabase
 
                 var lessonId = (long)command.ExecuteScalar();
 
-                // ��������� ���� (������ dd.MM)
                 command.CommandText = @"
                     INSERT INTO schedule_dates (lesson_id, date)
                     VALUES (@lesson_id, @date)";
@@ -233,7 +226,6 @@ namespace StankinAppDatabase
             Console.WriteLine("date = " + date.ToString("dd.MM", null));
 
             command.Parameters.AddWithValue("@groupName", groupName);
-            // ���������� ������ dd.MM ��� ����
             command.Parameters.AddWithValue("@date", date.ToString("dd.MM", null));
 
             var s = command.CommandText.ToString();

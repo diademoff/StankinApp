@@ -16,10 +16,40 @@ namespace StankinAppDatabase.Tests
         private NodaTime.Period _period;
         private string _group;
 
+        Course[] HandleParseError(ErrorParsingInfo line)
+        {
+            if (line.LineToParse == "Технологии индустрии 4.0. Волкова О.Р. семинар. 409. [19.02-12.03 к.н.] Технологии индустрии 4.0. Волкова О.Р. семинар. 308. [19.03-07.05 к.н.]")
+            {
+                return new Course[]
+                {
+                    new Course()
+                    {
+                        Subject = "Технологии индустрии 4.0",
+                        Teacher = "Волкова О.Р.",
+                        Type = "семинар",
+                        Cabinet = "409",
+                        StartTime = line.StartTime,
+                        Dates = _reader.ParseSchedule("[19.02-12.03 к.н.]", 2025)
+                    },
+                    new Course()
+                    {
+                        Subject = "Технологии индустрии 4.0",
+                        Teacher = "Волкова О.Р.",
+                        Type = "семинар",
+                        Cabinet = "308",
+                        StartTime = line.StartTime,
+                        Dates = _reader.ParseSchedule("[19.03-07.05 к.н.]", 2025)
+                    },
+                };
+            }
+
+            throw new NotImplementedException();
+        }
+
         [SetUp]
         public void Setup()
         {
-            _reader = new ScheduleJsonReader(2025);
+            _reader = new ScheduleJsonReader(2025, HandleParseError);
             _time = new NodaTime.LocalTime(12, 20);
             _period = NodaTime.Period.FromTicks(1000);
             _group = "grp";
@@ -263,6 +293,72 @@ namespace StankinAppDatabase.Tests
                 Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 04, 05)));
                 Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 04, 12)));
                 Assert.That(output, Contains.Item(new NodaTime.LocalDate(2025, 04, 19)));
+            });
+        }
+
+        [Test]
+        public void ParsWithDotTest()
+        {
+            string input = "Технологии индустрии 4.0. Волкова О.Р. семинар. 409. [19.02-12.03 к.н.] Технологии индустрии 4.0. Волкова О.Р. семинар. 308. [19.03-07.05 к.н.]";
+
+            var output = _reader.ParseLessons(input, _time, _period, _group);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(output[0].Subject, Is.EqualTo("Технологии индустрии 4.0"));
+                Assert.That(output[0].Teacher, Is.EqualTo("Волкова О.Р."));
+                Assert.That(output[0].Type, Is.EqualTo("семинар"));
+                Assert.That(output[0].Cabinet, Is.EqualTo("409"));
+                Assert.That(string.IsNullOrEmpty(output[0].Subgroup));
+
+                Assert.That(output[1].Subject, Is.EqualTo("Технологии индустрии 4.0"));
+                Assert.That(output[1].Teacher, Is.EqualTo("Волкова О.Р."));
+                Assert.That(output[1].Type, Is.EqualTo("семинар"));
+                Assert.That(output[1].Cabinet, Is.EqualTo("308"));
+                Assert.That(string.IsNullOrEmpty(output[1].Subgroup));
+            });
+        }
+
+        [Test]
+        public void ParseWithDashTest()
+        {
+            /* 
+             * Иногда после '-' ставится пробел. Он должен игнорироваться
+             */
+            string input = "Графические системы и интерфейс оператора. Евстафиева С.В. семинар. 355. [17.02-10.03 к.н.] Объектно- ориентированное проектирование. Евстафиева С.В. семинар. 355. [17.03-21.04 к.н.]";
+
+            var output = _reader.ParseLessons(input, _time, _period, _group);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(output[0].Subject, Is.EqualTo("Графические системы и интерфейс оператора"));
+                Assert.That(output[0].Teacher, Is.EqualTo("Евстафиева С.В."));
+                Assert.That(output[0].Type, Is.EqualTo("семинар"));
+                Assert.That(output[0].Cabinet, Is.EqualTo("355"));
+                Assert.That(string.IsNullOrEmpty(output[0].Subgroup));
+
+                Assert.That(output[1].Subject, Is.EqualTo("Объектно-ориентированное проектирование"));
+                Assert.That(output[1].Teacher, Is.EqualTo("Евстафиева С.В."));
+                Assert.That(output[1].Type, Is.EqualTo("семинар"));
+                Assert.That(output[1].Cabinet, Is.EqualTo("355"));
+                Assert.That(string.IsNullOrEmpty(output[1].Subgroup));
+            });
+        }
+
+        [Test]
+        public void ParseTest()
+        {
+            string input = "Основы проектирования и разработки Web-приложений. Иванов И.И. лабораторные занятия. (Б). 235(и). [19.03-30.04 ч.н.]";
+
+            var output = _reader.ParseLessons(input, _time, _period, _group);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(output[0].Subject, Is.EqualTo("Основы проектирования и разработки Web-приложений"));
+                Assert.That(output[0].Teacher, Is.EqualTo("Иванов И.И."));
+                Assert.That(output[0].Type, Is.EqualTo("лабораторные занятия"));
+                Assert.That(output[0].Cabinet, Is.EqualTo("235(и)"));
+                Assert.That(output[0].Subgroup, Is.EqualTo("Б"));
             });
         }
     }

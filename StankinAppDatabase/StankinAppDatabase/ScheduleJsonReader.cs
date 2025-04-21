@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 namespace StankinAppDatabase
 {
-    public class Course
+    public struct Course
     {
         public LocalTime StartTime { get; set; }
         public Period? Duration { get; set; }
@@ -48,9 +48,12 @@ namespace StankinAppDatabase
         private static readonly HashSet<string> AllowedLessonTypes = ["лекции", "семинар", "лабораторные занятия"];
         int currentYear;
 
-        public ScheduleJsonReader(int currentYear)
+        Func<ErrorParsingInfo, Course[]> parseError;
+
+        public ScheduleJsonReader(int currentYear, Func<ErrorParsingInfo, Course[]> parseError)
         {
             this.currentYear = currentYear;
+            this.parseError = parseError;
         }
 
         public Schedule GetSchedule(string groupName, string fileJson)
@@ -117,8 +120,19 @@ namespace StankinAppDatabase
             return Regex.Matches(rowString, pattern, RegexOptions.Compiled | RegexOptions.IgnoreCase);
         }
 
-        public List<Course> ParseLessons(string lessonLine, LocalTime startTime, Period duration, string groupName)
+        string FixSubject(string subject)
         {
+            if (string.IsNullOrEmpty(subject))
+                return subject;
+
+            // Используем регулярное выражение для поиска минуса, за которым следует пробел, и заменяем на минус без пробела
+            return System.Text.RegularExpressions.Regex.Replace(subject, @"-\s+", "-");
+        }
+
+        public List<Course> ParseLessons(string lessonLine, LocalTime startTime, Period duration, string groupName, bool throwOnFail=false)
+        {
+            // lessonLine example: 
+            // Интеграция информационных систем и технологий. Тихомирова В.Д. лабораторные занятия. (А). 249(б). [26.03-23.04 ч.н., 14.05]
             MatchCollection matches = GetCoursesInString(lessonLine);
 
             if (matches == null) throw new ArgumentNullException();
@@ -129,6 +143,7 @@ namespace StankinAppDatabase
                 if (match.Success)
                 {
                     var subject = match.Groups["subject"].Value.Trim();
+                    subject = FixSubject(subject);
                     var teacher = match.Groups["teacher"].Success ? match.Groups["teacher"].Value.Trim() : "";
                     var type = match.Groups["type"].Value.Trim();
                     var subgroup = match.Groups["subgroup"].Success ? match.Groups["subgroup"].Value.Trim() : "";
@@ -152,6 +167,21 @@ namespace StankinAppDatabase
                     entries.Add(entry);
                 }
             }
+
+            // Вызвать обработчик ошибок парсинга
+            bool isCorrect = entries.TrueForAll(x => !string.IsNullOrWhiteSpace(x.Subject) && x.Subject.Length > 3 && AllowedLessonTypes.Contains(x.Type));
+            if (!isCorrect)
+            {
+                if (throwOnFail)
+                    throw new Exception("Parsing failed");
+                return parseError(new ErrorParsingInfo()
+                {
+                    LineToParse = lessonLine,
+                    GroupName = groupName,
+                    StartTime = startTime,
+                    Duration = duration
+                }).ToList();
+            }    
 
             return entries;
         }
