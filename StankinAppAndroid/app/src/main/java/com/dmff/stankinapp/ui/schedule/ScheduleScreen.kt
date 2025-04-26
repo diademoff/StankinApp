@@ -1,7 +1,5 @@
 package com.dmff.stankinapp.ui.schedule
 
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -33,27 +31,19 @@ fun ScheduleScreen(
     onNavigateBack: () -> Unit
 ) {
     val listState = rememberLazyListState()
-    var initialScrollDone by remember { mutableStateOf(false) }
-
-    // Для отображения диалога выбора даты
     var showDatePicker by remember { mutableStateOf(false) }
 
-    // Прокрутка к выбранной дате при запуске
-    LaunchedEffect(schedule) {
-        if (!initialScrollDone && schedule.isNotEmpty()) {
-            val sortedDates = schedule.keys.toList().sorted()
-            val index = sortedDates.indexOfFirst { it == currentDate }
-            if (index != -1) {
-                listState.scrollToItem(index)
-                initialScrollDone = true
-            }
+    // Прокрутка к выбранной дате после обновления расписания
+    LaunchedEffect(currentDate, schedule) {
+        val sortedDates = schedule.keys.toList().sorted()
+        val index = sortedDates.indexOf(currentDate)
+        if (index != -1) {
+            listState.scrollToItem(index)
         }
     }
 
-    // Логика для подгрузки данных при прокрутке
+    // Логика подгрузки данных при прокрутке
     val sortedSchedule = remember(schedule) { schedule.toSortedMap() }
-    val totalCount = sortedSchedule.size
-
     LaunchedEffect(listState, schedule) {
         snapshotFlow { listState.layoutInfo.visibleItemsInfo }
             .filter { it.isNotEmpty() }
@@ -64,23 +54,18 @@ fun ScheduleScreen(
                     val lastVisibleIndex = visibleItems.last().index
                     val totalCount = sortedSchedule.size
 
-                    // Подгрузка при скролле вверх
                     if (firstVisibleIndex <= 3) {
                         val firstDate = sortedSchedule.keys.firstOrNull()
                         if (firstDate != null) {
                             onLoadMore(firstDate.minusDays(7), true)
                         }
                     }
-
-                    // Подгрузка при скролле вниз
                     if (lastVisibleIndex >= totalCount - 3) {
                         val lastDate = sortedSchedule.keys.lastOrNull()
                         if (lastDate != null) {
                             onLoadMore(lastDate.plusDays(7), false)
                         }
                     }
-                } else {
-                    println("visibleItems или sortedSchedule пусты")
                 }
             }
     }
@@ -165,7 +150,7 @@ fun DaySchedule(date: LocalDate, courses: List<Course>) {
 
         if (courses.isEmpty()) {
             Text(
-                text = "No classes scheduled",
+                text = "Нет расписания",
                 style = MaterialTheme.typography.bodyMedium
             )
         } else {
@@ -180,8 +165,7 @@ fun DaySchedule(date: LocalDate, courses: List<Course>) {
 @Composable
 fun ScheduleCard(course: Course) {
     Card(
-        modifier = Modifier
-            .fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)

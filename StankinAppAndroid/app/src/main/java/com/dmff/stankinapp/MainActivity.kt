@@ -28,9 +28,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Install splash screen
         installSplashScreen()
-        
         enableEdgeToEdge()
 
         database = ScheduleDatabase(this)
@@ -49,23 +47,27 @@ class MainActivity : ComponentActivity() {
                     var listEndDate by remember { mutableStateOf(LocalDate.now().plusDays(7)) }
                     var currentDate by remember { mutableStateOf(LocalDate.now()) }
 
-                    // Load saved group
+                    // Загрузка выбранной группы
                     LaunchedEffect(Unit) {
                         userPreferences.selectedGroup.collectLatest { group ->
                             selectedGroup = group
                         }
                     }
 
-                    // Load schedule when group is selected
-                    LaunchedEffect(selectedGroup, listStartDate, listEndDate) {
+                    // Загрузка расписания при выборе группы или изменении текущей даты
+                    LaunchedEffect(selectedGroup, currentDate) {
                         if (selectedGroup != null) {
-                            for (date in listStartDate..listEndDate) {
+                            val startDate = currentDate.minusDays(7)
+                            val endDate = currentDate.plusDays(7)
+                            for (date in startDate..endDate) {
                                 if (date !in loadedDates) {
                                     loadedDates.add(date)
                                     val courses = database.getScheduleForGroup(selectedGroup!!, date)
                                     schedule = schedule + (date to courses)
                                 }
                             }
+                            listStartDate = startDate
+                            listEndDate = endDate
                         }
                     }
 
@@ -83,7 +85,9 @@ class MainActivity : ComponentActivity() {
                             groupName = selectedGroup!!,
                             schedule = schedule,
                             currentDate = currentDate,
-                            onDateChange = { newDate -> currentDate = newDate },
+                            onDateChange = { newDate ->
+                                currentDate = newDate
+                            },
                             onLoadMore = { date, isStart ->
                                 if (isStart) {
                                     listStartDate = date
@@ -100,7 +104,7 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// helper for LocalDate range
+// Итератор для диапазона дат
 operator fun ClosedRange<LocalDate>.iterator() = generateSequence(start) { it.plusDays(1) }
     .takeWhile { it <= endInclusive }
     .iterator()
