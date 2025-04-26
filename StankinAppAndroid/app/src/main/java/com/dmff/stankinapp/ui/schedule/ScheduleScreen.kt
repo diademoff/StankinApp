@@ -12,6 +12,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dmff.stankinapp.data.model.Course
@@ -30,17 +31,22 @@ fun ScheduleScreen(
     currentDate: LocalDate,
     onDateChange: (LocalDate) -> Unit,
     onLoadMore: (LocalDate, isStart: Boolean) -> Unit,
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onScheduleUpdatedByDatePicker: () -> Unit
 ) {
     val listState = rememberLazyListState()
     var showDatePicker by remember { mutableStateOf(false) }
+    val scheduleUpdatedByDatePicker = remember { mutableStateOf(true) }
 
-    // Прокрутка к выбранной дате после обновления расписания
+    // Прокрутка к выбранной дате после выбора даты в DatePicker
     LaunchedEffect(currentDate, schedule) {
-        val sortedDates = schedule.keys.toList().sorted()
-        val index = sortedDates.indexOf(currentDate)
-        if (index != -1) {
-            listState.scrollToItem(index)
+        if (scheduleUpdatedByDatePicker.value) {
+            val sortedDates = schedule.keys.toList().sorted()
+            val index = sortedDates.indexOf(currentDate)
+            if (index != -1) {
+                listState.scrollToItem(index)
+                scheduleUpdatedByDatePicker.value = false
+            }
         }
     }
 
@@ -128,6 +134,7 @@ fun ScheduleScreen(
                 { _, year, month, dayOfMonth ->
                     val selectedDate = LocalDate.of(year, month + 1, dayOfMonth)
                     onDateChange(selectedDate)
+                    scheduleUpdatedByDatePicker.value = true
                     showDatePicker = false
                 },
                 currentDate.year,
@@ -155,7 +162,9 @@ fun DaySchedule(date: LocalDate, courses: List<Course>) {
         if (courses.isEmpty()) {
             Text(
                 text = "Нет расписания",
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
             )
         } else {
             courses.forEach { course ->

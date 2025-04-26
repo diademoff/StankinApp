@@ -46,6 +46,7 @@ class MainActivity : ComponentActivity() {
                     var listStartDate by remember { mutableStateOf(LocalDate.now().minusDays(7)) }
                     var listEndDate by remember { mutableStateOf(LocalDate.now().plusDays(7)) }
                     var currentDate by remember { mutableStateOf(LocalDate.now()) }
+                    var scheduleUpdatedByDatePicker by remember { mutableStateOf(false) }
 
                     // Загрузка выбранной группы
                     LaunchedEffect(Unit) {
@@ -71,6 +72,21 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
+                    // Подгрузка при прокручивании
+                    LaunchedEffect(listStartDate, listEndDate) {
+                        if (selectedGroup != null) {
+                            val startDate = listStartDate
+                            val endDate = listEndDate
+                            for (date in startDate..endDate) {
+                                if (date !in loadedDates) {
+                                    loadedDates.add(date)
+                                    val courses = database.getScheduleForGroup(selectedGroup!!, date)
+                                    schedule = schedule + (date to courses)
+                                }
+                            }
+                        }
+                    }
+
                     if (selectedGroup == null) {
                         WelcomeScreen(
                             groups = database.getGroups(),
@@ -87,6 +103,7 @@ class MainActivity : ComponentActivity() {
                             currentDate = currentDate,
                             onDateChange = { newDate ->
                                 currentDate = newDate
+                                scheduleUpdatedByDatePicker = true
                             },
                             onLoadMore = { date, isStart ->
                                 if (isStart) {
@@ -95,7 +112,8 @@ class MainActivity : ComponentActivity() {
                                     listEndDate = date
                                 }
                             },
-                            onNavigateBack = { finish() }
+                            onNavigateBack = { finish() },
+                            onScheduleUpdatedByDatePicker = { scheduleUpdatedByDatePicker = true }
                         )
                     }
                 }
