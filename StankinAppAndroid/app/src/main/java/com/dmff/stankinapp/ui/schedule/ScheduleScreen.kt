@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dmff.stankinapp.data.model.Course
@@ -34,7 +35,10 @@ fun ScheduleScreen(
     val listState = rememberLazyListState()
     var initialScrollDone by remember { mutableStateOf(false) }
 
-    // Прокручивание до сегодняшней даты при запуске
+    // Для отображения диалога выбора даты
+    var showDatePicker by remember { mutableStateOf(false) }
+
+    // Прокрутка к выбранной дате при запуске
     LaunchedEffect(schedule) {
         if (!initialScrollDone && schedule.isNotEmpty()) {
             val sortedDates = schedule.keys.toList().sorted()
@@ -91,7 +95,7 @@ fun ScheduleScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { /* TODO: Show date picker */ }) {
+                    IconButton(onClick = { showDatePicker = true }) {
                         Icon(Icons.Default.CalendarToday, contentDescription = "Select date")
                     }
                 }
@@ -123,6 +127,27 @@ fun ScheduleScreen(
                     DaySchedule(date, courses)
                 }
             }
+        }
+    }
+
+    // Диалог выбора даты
+    if (showDatePicker) {
+        val context = LocalContext.current
+        val picker = remember {
+            android.app.DatePickerDialog(
+                context,
+                { _, year, month, dayOfMonth ->
+                    val selectedDate = LocalDate.of(year, month + 1, dayOfMonth)
+                    onDateChange(selectedDate)
+                    showDatePicker = false
+                },
+                currentDate.year,
+                currentDate.monthValue - 1,
+                currentDate.dayOfMonth
+            )
+        }
+        LaunchedEffect(Unit) {
+            picker.show()
         }
     }
 }
