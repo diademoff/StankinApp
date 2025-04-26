@@ -15,6 +15,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.dmff.stankinapp.data.model.Course
+import com.dmff.stankinapp.data.model.mergeConsecutiveCourses
+import com.dmff.stankinapp.data.model.mergeCoursesByAttributes
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -109,7 +111,9 @@ fun ScheduleScreen(
                     items = sortedSchedule.entries.toList(),
                     key = { it.key }
                 ) { (date, courses) ->
-                    DaySchedule(date, courses)
+                    // Объединяем курсы перед отображением
+                    val mergedCourses = mergeCoursesByAttributes(courses)
+                    DaySchedule(date, mergedCourses)
                 }
             }
         }
@@ -188,7 +192,7 @@ fun ScheduleCard(course: Course) {
                 )
                 Text(
                     text = course.startTime
-                        .plus(course.duration!!)
+                        .plus(course.duration)
                         .format(DateTimeFormatter.ofPattern("HH:mm")),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
