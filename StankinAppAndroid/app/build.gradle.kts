@@ -45,16 +45,17 @@ android {
 dependencies {
     // Compose
     implementation(platform("androidx.compose:compose-bom:2024.02.00"))
-    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.material:material")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.7.0")
-    implementation("androidx.activity:activity-compose:1.8.2")
-    implementation("androidx.compose.runtime:runtime:1.6.1")
-    implementation("androidx.compose.runtime:runtime-livedata:1.6.1")
-    implementation("androidx.compose.runtime:runtime-saveable:1.6.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose")
+    implementation("androidx.activity:activity-compose")
+    implementation("androidx.compose.runtime:runtime")
+    implementation("androidx.compose.runtime:runtime-livedata")
+    implementation("androidx.compose.runtime:runtime-saveable")
+    implementation(libs.material.icons.extended)
 
     // Preferences
     implementation("androidx.datastore:datastore-preferences:1.0.0")
@@ -74,7 +75,6 @@ dependencies {
     implementation("androidx.core:core-splashscreen:1.0.1")
 
     // Material Components
-    implementation("androidx.compose.material3:material3:1.2.0")
     implementation("com.google.android.material:material:1.11.0")
 
     // Testing

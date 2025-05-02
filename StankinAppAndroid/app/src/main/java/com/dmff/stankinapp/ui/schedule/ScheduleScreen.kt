@@ -4,10 +4,11 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.background
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material3.*
+import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,7 +24,6 @@ import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduleScreen(
     groupName: String,
@@ -80,19 +80,25 @@ fun ScheduleScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text(groupName) },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+            Column {
+                Spacer(Modifier
+                    .windowInsetsTopHeight(WindowInsets.statusBars)
+                    .background(MaterialTheme.colors.primary))
+
+                TopAppBar(
+                    title = { Text(groupName) },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { showDatePicker = true }) {
+                            Icon(Icons.Filled.CalendarToday, contentDescription = "Select date")
+                        }
                     }
-                },
-                actions = {
-                    IconButton(onClick = { showDatePicker = true }) {
-                        Icon(Icons.Default.CalendarToday, contentDescription = "Select date")
-                    }
-                }
-            )
+                )
+            }
         }
     ) { padding ->
         if (schedule.isEmpty()) {
@@ -156,13 +162,13 @@ fun DaySchedule(date: LocalDate, courses: List<Course>) {
     ) {
         Text(
             text = date.format(DateTimeFormatter.ofPattern("EEEE, d MMMM")),
-            style = MaterialTheme.typography.titleLarge
+            style = MaterialTheme.typography.subtitle1
         )
 
         if (courses.isEmpty()) {
             Text(
                 text = "Нет расписания",
-                style = MaterialTheme.typography.bodyMedium,
+                style = MaterialTheme.typography.body2,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center
             )
@@ -174,15 +180,14 @@ fun DaySchedule(date: LocalDate, courses: List<Course>) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ScheduleCard(course: Course) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        elevation = 2.dp,
         shape = MaterialTheme.shapes.medium,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
-    ) {
+        backgroundColor = MaterialTheme.colors.surface // заменено surfaceVariant
+    ){
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -197,14 +202,14 @@ fun ScheduleCard(course: Course) {
             ) {
                 Text(
                     text = course.startTime.format(DateTimeFormatter.ofPattern("HH:mm")),
-                    style = MaterialTheme.typography.labelLarge
+                    style = MaterialTheme.typography.subtitle1 // заменено titleLarge
                 )
                 Text(
                     text = course.startTime
                         .plus(course.duration)
                         .format(DateTimeFormatter.ofPattern("HH:mm")),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MaterialTheme.typography.subtitle1, // заменено titleLarge
+                    color = MaterialTheme.colors.onSurface // заменено surfaceVariant
                 )
             }
 
@@ -214,7 +219,7 @@ fun ScheduleCard(course: Course) {
             ) {
                 Text(
                     text = course.subject.orEmpty(),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.subtitle1, // заменено titleMedium
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -223,13 +228,13 @@ fun ScheduleCard(course: Course) {
                     if (!course.type.isNullOrEmpty()) {
                         Text(
                             text = course.type,
-                            style = MaterialTheme.typography.bodySmall
+                            style = MaterialTheme.typography.caption // заменено bodySmall
                         )
                     }
                     if (!course.subgroup.isNullOrEmpty()) {
                         Text(
                             text = "п/г ${course.subgroup}",
-                            style = MaterialTheme.typography.bodySmall
+                            style = MaterialTheme.typography.caption // заменено bodySmall
                         )
                     }
                 }
@@ -241,13 +246,13 @@ fun ScheduleCard(course: Course) {
                     if (!course.teacher.isNullOrEmpty()) {
                         Text(
                             text = course.teacher,
-                            style = MaterialTheme.typography.bodySmall
+                            style = MaterialTheme.typography.caption // заменено bodySmall
                         )
                     }
                     if (!course.cabinet.isNullOrEmpty()) {
                         Text(
                             text = course.cabinet,
-                            style = MaterialTheme.typography.bodySmall
+                            style = MaterialTheme.typography.caption // заменено bodySmall
                         )
                     }
                 }

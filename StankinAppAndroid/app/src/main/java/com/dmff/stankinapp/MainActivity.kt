@@ -4,21 +4,21 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.lifecycleScope
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.dmff.stankinapp.data.db.ScheduleDatabase
 import com.dmff.stankinapp.data.model.Course
 import com.dmff.stankinapp.data.preferences.UserPreferences
 import com.dmff.stankinapp.ui.schedule.ScheduleScreen
 import com.dmff.stankinapp.ui.theme.StankinAppTheme
-import com.dmff.stankinapp.ui.welcome.WelcomeScreen
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 class MainActivity : ComponentActivity() {
@@ -38,7 +38,7 @@ class MainActivity : ComponentActivity() {
             StankinAppTheme {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
+                    color = MaterialTheme.colors.background
                 ) {
                     var selectedGroup by remember { mutableStateOf<String?>(null) }
                     var schedule by remember { mutableStateOf<Map<LocalDate, List<Course>>>(emptyMap()) }
@@ -47,6 +47,9 @@ class MainActivity : ComponentActivity() {
                     var listEndDate by remember { mutableStateOf(LocalDate.now().plusDays(7)) }
                     var currentDate by remember { mutableStateOf(LocalDate.now()) }
                     var scheduleUpdatedByDatePicker by remember { mutableStateOf(false) }
+
+                    // Для навигации
+                    var currentScreen by remember { mutableStateOf("schedule") } // "schedule" или "settings"
 
                     // Загрузка выбранной группы
                     LaunchedEffect(Unit) {
@@ -87,38 +90,65 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    if (selectedGroup == null) {
-                        WelcomeScreen(
-                            groups = database.getGroups(),
-                            onGroupSelected = { group ->
-                                lifecycleScope.launch {
-                                    userPreferences.setSelectedGroup(group)
-                                }
+                    Scaffold(
+                        bottomBar = {
+                            BottomNavigation(
+                                backgroundColor = MaterialTheme.colors.surface,
+                                contentColor = MaterialTheme.colors.onSurface
+                            ) {
+                                BottomNavigationItem(
+                                    icon = { Icon(Icons.Filled.Home, contentDescription = "Домой") },
+                                    //label = { Text("Домой") },
+                                    selected = currentScreen == "schedule",
+                                    onClick = { currentScreen = "schedule" }
+                                )
+                                BottomNavigationItem(
+                                    icon = { Icon(Icons.Filled.Settings, contentDescription = "Настройки") },
+                                    //label = { Text("Настройки") },
+                                    selected = currentScreen == "settings",
+                                    onClick = { currentScreen = "settings" }
+                                )
                             }
-                        )
-                    } else {
-                        ScheduleScreen(
-                            groupName = selectedGroup!!,
-                            schedule = schedule,
-                            currentDate = currentDate,
-                            onDateChange = { newDate ->
-                                currentDate = newDate
-                                scheduleUpdatedByDatePicker = true
-                            },
-                            onLoadMore = { date, isStart ->
-                                if (isStart) {
-                                    listStartDate = date
-                                } else {
-                                    listEndDate = date
-                                }
-                            },
-                            onNavigateBack = { finish() },
-                            onScheduleUpdatedByDatePicker = { scheduleUpdatedByDatePicker = true }
-                        )
+                        }
+                    ) { paddingValues ->
+                        Column(modifier = Modifier.padding(paddingValues)) {
+                            when (currentScreen) {
+                                "schedule" -> ScheduleScreen(
+                                    groupName = selectedGroup ?: "",
+                                    schedule = schedule,
+                                    currentDate = currentDate,
+                                    onDateChange = { newDate ->
+                                        currentDate = newDate
+                                        scheduleUpdatedByDatePicker = true
+                                    },
+                                    onLoadMore = { date, isStart ->
+                                        if (isStart) {
+                                            listStartDate = date
+                                        } else {
+                                            listEndDate = date
+                                        }
+                                    },
+                                    onNavigateBack = { finish() },
+                                    onScheduleUpdatedByDatePicker = { scheduleUpdatedByDatePicker = true }
+                                )
+                                "settings" -> SettingsScreen()
+                            }
+                        }
                     }
                 }
             }
         }
+    }
+}
+
+// Заглушка для экрана настроек
+@Composable
+fun SettingsScreen() {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text("Настройки пока не реализованы")
     }
 }
 
