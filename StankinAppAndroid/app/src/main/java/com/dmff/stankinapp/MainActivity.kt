@@ -1,5 +1,6 @@
 package com.dmff.stankinapp
 
+import WelcomeScreen
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -19,12 +20,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import androidx.lifecycle.lifecycleScope
 import com.dmff.stankinapp.data.db.ScheduleDatabase
 import com.dmff.stankinapp.data.model.Course
 import com.dmff.stankinapp.data.preferences.UserPreferences
 import com.dmff.stankinapp.ui.schedule.ScheduleScreen
 import com.dmff.stankinapp.ui.theme.StankinAppTheme
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 class MainActivity : ComponentActivity() {
@@ -96,48 +99,60 @@ class MainActivity : ComponentActivity() {
                         }
                     }
 
-                    Scaffold(
-                        bottomBar = {
-                            BottomNavigation(
-                                backgroundColor = MaterialTheme.colors.surface,
-                                contentColor = MaterialTheme.colors.onSurface
-                            ) {
-                                BottomNavigationItem(
-                                    icon = { Icon(Icons.Filled.Home, contentDescription = "Домой") },
-                                    //label = { Text("Домой") },
-                                    selected = currentScreen == "schedule",
-                                    onClick = { currentScreen = "schedule" }
-                                )
-                                BottomNavigationItem(
-                                    icon = { Icon(Icons.Filled.Settings, contentDescription = "Настройки") },
-                                    //label = { Text("Настройки") },
-                                    selected = currentScreen == "settings",
-                                    onClick = { currentScreen = "settings" }
-                                )
+
+                    if (selectedGroup == null) {
+                        WelcomeScreen(
+                            groups = database.getGroups(),
+                            onGroupSelected = { group ->
+                                lifecycleScope.launch {
+                                    userPreferences.setSelectedGroup(group)
+                                }
                             }
-                        }
-                    ) { paddingValues ->
-                        Column(modifier = Modifier.padding(paddingValues)) {
-                            when (currentScreen) {
-                                "schedule" -> ScheduleScreen(
-                                    groupName = selectedGroup ?: "",
-                                    schedule = schedule,
-                                    currentDate = currentDate,
-                                    onDateChange = { newDate ->
-                                        currentDate = newDate
-                                        scheduleUpdatedByDatePicker = true
-                                    },
-                                    onLoadMore = { date, isStart ->
-                                        if (isStart) {
-                                            listStartDate = date
-                                        } else {
-                                            listEndDate = date
-                                        }
-                                    },
-                                    onNavigateBack = { finish() },
-                                    onScheduleUpdatedByDatePicker = { scheduleUpdatedByDatePicker = true }
-                                )
-                                "settings" -> SettingsScreen()
+                        )
+                    } else {
+                        Scaffold(
+                            bottomBar = {
+                                BottomNavigation(
+                                    backgroundColor = MaterialTheme.colors.surface,
+                                    contentColor = MaterialTheme.colors.onSurface
+                                ) {
+                                    BottomNavigationItem(
+                                        icon = { Icon(Icons.Filled.Home, contentDescription = "Домой") },
+                                        //label = { Text("Домой") },
+                                        selected = currentScreen == "schedule",
+                                        onClick = { currentScreen = "schedule" }
+                                    )
+                                    BottomNavigationItem(
+                                        icon = { Icon(Icons.Filled.Settings, contentDescription = "Настройки") },
+                                        //label = { Text("Настройки") },
+                                        selected = currentScreen == "settings",
+                                        onClick = { currentScreen = "settings" }
+                                    )
+                                }
+                            }
+                        ) { paddingValues ->
+                            Column(modifier = Modifier.padding(paddingValues)) {
+                                when (currentScreen) {
+                                    "schedule" -> ScheduleScreen(
+                                        groupName = selectedGroup ?: "",
+                                        schedule = schedule,
+                                        currentDate = currentDate,
+                                        onDateChange = { newDate ->
+                                            currentDate = newDate
+                                            scheduleUpdatedByDatePicker = true
+                                        },
+                                        onLoadMore = { date, isStart ->
+                                            if (isStart) {
+                                                listStartDate = date
+                                            } else {
+                                                listEndDate = date
+                                            }
+                                        },
+                                        onNavigateBack = { finish() },
+                                        onScheduleUpdatedByDatePicker = { scheduleUpdatedByDatePicker = true }
+                                    )
+                                    "settings" -> SettingsScreen()
+                                }
                             }
                         }
                     }
