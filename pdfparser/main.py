@@ -1,6 +1,7 @@
 import camelot
 import json
 import os
+from pathlib import Path
 
 # Сектор - это текст на пересечении времени и дня недели
 class Sector:
@@ -145,7 +146,7 @@ def extractByFilename(filename):
     # camelot.plot(tables[0], kind='joint').show()
     finalData = extractFinalData(tables[0].cells)
 
-    savefilename = os.path.basename(filename).split('.')[0] + '.json'
+    savefilename = Path(os.path.basename(filename)).stem + '.json'
     with open(savefilename, 'w', encoding='utf-8') as f:
         json.dump(finalData, f, ensure_ascii=False, indent=4)
 

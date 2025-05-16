@@ -4,11 +4,11 @@ using System.Collections.Generic;
 
 namespace StankinAppDatabase
 {
-    internal class Program
+    public class Program
     {
         const string FOLDER_PATH = "D:\\repos\\StankinApp\\pdfparser\\json";
         const string DB_PATH = "schedule.db";
-        static int year;
+        public static int year;
         static ScheduleJsonReader _reader;
 
         readonly static string[] SubjectNamesWithDots =
@@ -27,8 +27,10 @@ namespace StankinAppDatabase
             new Tuple<string, string>("Агоштинью Адау Какулу  . .", "Агоштинью Адау Какулу"), // да, два пробела
         };
 
-        static Course[] HandleParseError(ErrorParsingInfo err)
+        public static Course[] HandleParseError(ErrorParsingInfo err)
         {
+            if (_reader is null)
+                _reader = new ScheduleJsonReader(year, null);
             // Обработка названий предметов с точкой в названии
             var subjectNameWithDots = SubjectNamesWithDots.Where(x => err.LineToParse.Contains(x));
             var subjectNameWithDotExists = subjectNameWithDots.Any();
@@ -136,6 +138,7 @@ namespace StankinAppDatabase
 
         static void Main(string[] args)
         {
+            DatabaseBuilder builder = new DatabaseBuilder(DateTime.Now.Year, HandleParseError, DB_PATH);
 
 #if DEBUG
             // Check if database exists
@@ -170,7 +173,6 @@ namespace StankinAppDatabase
                 return;
             }
 #endif
-            DatabaseBuilder builder = new DatabaseBuilder(DateTime.Now.Year, HandleParseError, DB_PATH);
             // Start the UI
             var ui = new UI(builder);
             ui.Run();

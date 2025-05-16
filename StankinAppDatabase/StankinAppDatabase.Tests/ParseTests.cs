@@ -16,40 +16,11 @@ namespace StankinAppDatabase.Tests
         private NodaTime.Period _period;
         private string _group;
 
-        Course[] HandleParseError(ErrorParsingInfo line)
-        {
-            if (line.LineToParse == "Технологии индустрии 4.0. Волкова О.Р. семинар. 409. [19.02-12.03 к.н.] Технологии индустрии 4.0. Волкова О.Р. семинар. 308. [19.03-07.05 к.н.]")
-            {
-                return new Course[]
-                {
-                    new Course()
-                    {
-                        Subject = "Технологии индустрии 4.0",
-                        Teacher = "Волкова О.Р.",
-                        Type = "семинар",
-                        Cabinet = "409",
-                        StartTime = line.StartTime,
-                        Dates = _reader.ParseSchedule("[19.02-12.03 к.н.]", 2025)
-                    },
-                    new Course()
-                    {
-                        Subject = "Технологии индустрии 4.0",
-                        Teacher = "Волкова О.Р.",
-                        Type = "семинар",
-                        Cabinet = "308",
-                        StartTime = line.StartTime,
-                        Dates = _reader.ParseSchedule("[19.03-07.05 к.н.]", 2025)
-                    },
-                };
-            }
-
-            throw new NotImplementedException();
-        }
-
         [SetUp]
         public void Setup()
         {
-            _reader = new ScheduleJsonReader(2025, HandleParseError);
+            Program.year = 2025;
+            _reader = new ScheduleJsonReader(2025, Program.HandleParseError);
             _time = new NodaTime.LocalTime(12, 20);
             _period = NodaTime.Period.FromTicks(1000);
             _group = "grp";
@@ -297,7 +268,7 @@ namespace StankinAppDatabase.Tests
         }
 
         [Test]
-        public void ParsWithDotTest()
+        public void ParseWithDotTest()
         {
             string input = "Технологии индустрии 4.0. Волкова О.Р. семинар. 409. [19.02-12.03 к.н.] Технологии индустрии 4.0. Волкова О.Р. семинар. 308. [19.03-07.05 к.н.]";
 
@@ -359,6 +330,22 @@ namespace StankinAppDatabase.Tests
                 Assert.That(output[0].Type, Is.EqualTo("лабораторные занятия"));
                 Assert.That(output[0].Cabinet, Is.EqualTo("235(и)"));
                 Assert.That(output[0].Subgroup, Is.EqualTo("Б"));
+            });
+        }
+
+        [Test]
+        public void ParseWithSymbolTest()
+        {
+            string input = "Введение в проектную деятельность: технологическое и социальное проектирование. Окоракова А.А. лекции. 0801. [12.02-19.03 к.н., 02.04, 09.04] Психология и педагогика. Кузнецов Б.М. семинар. 504. [23.04-28.05 к.н.]";
+
+            var output = _reader.ParseLessons(input, _time, _period, _group);
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(output[0].Subject, Is.EqualTo("Введение в проектную деятельность: технологическое и социальное проектирование"));
+                Assert.That(output[0].Teacher, Is.EqualTo("Окоракова А.А."));
+                Assert.That(output[0].Type, Is.EqualTo("лекции"));
+                Assert.That(output[0].Cabinet, Is.EqualTo("0801"));
             });
         }
     }
