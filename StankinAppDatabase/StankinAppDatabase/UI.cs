@@ -7,7 +7,7 @@ namespace StankinAppDatabase
 {
     public class UI
     {
-        private readonly DatabaseBuilder _builder;
+        private readonly DatabaseReader _builder;
         private List<string> _groups;
         private ListView _groupsListView;
         private ListView _scheduleListView;
@@ -23,9 +23,9 @@ namespace StankinAppDatabase
         private bool _isTeacherSelected;
         private Label _dayOfWeekLabel;
 
-        public UI(DatabaseBuilder builder)
+        public UI(DatabaseReader reader)
         {
-            _builder = builder;
+            _builder = reader;
         }
 
         public void Run()

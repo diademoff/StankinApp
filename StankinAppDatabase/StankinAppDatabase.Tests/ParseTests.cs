@@ -1,11 +1,3 @@
-using NUnit.Framework;
-using System;
-using System.IO;
-using System.Reflection;
-using System.Text;
-using System.Text.Encodings.Web;
-using System.Text.Json;
-
 namespace StankinAppDatabase.Tests
 {
     [TestFixture]
@@ -19,8 +11,8 @@ namespace StankinAppDatabase.Tests
         [SetUp]
         public void Setup()
         {
-            Program.year = 2025;
-            _reader = new ScheduleJsonReader(2025, Program.HandleParseError);
+            HandleErrorMethods.year = 2025;
+            _reader = new ScheduleJsonReader(2025, HandleErrorMethods.HandleParseError2025);
             _time = new NodaTime.LocalTime(12, 20);
             _period = NodaTime.Period.FromTicks(1000);
             _group = "grp";
