@@ -37,7 +37,7 @@ namespace StankinAppDatabase
 
             using var command = connection.CreateCommand();
             command.CommandText = @"
-                SELECT l.subject, t.name as teacher, l.lesson_type, r.name as room, 
+                SELECT l.subject, t.name as teacher, l.lesson_type, r.name as room,
                        s.start_time, s.end_time, l.subgroup, g.name as group_name
                 FROM lessons l
                 JOIN sessions s ON l.session_id = s.id
@@ -47,10 +47,6 @@ namespace StankinAppDatabase
                 JOIN schedule_dates sd ON l.id = sd.lesson_id
                 WHERE g.name = @groupName AND sd.date = @date
                 ORDER BY s.start_time";
-
-
-            Console.WriteLine("group = " + groupName);
-            Console.WriteLine("date = " + date.ToString("dd.MM", null));
 
             command.Parameters.AddWithValue("@groupName", groupName);
             command.Parameters.AddWithValue("@date", date.ToString("dd.MM", null));
@@ -91,7 +87,7 @@ namespace StankinAppDatabase
 
             using var command = connection.CreateCommand();
             command.CommandText = @"
-                SELECT l.subject, t.name as teacher, l.lesson_type, r.name as room, 
+                SELECT l.subject, t.name as teacher, l.lesson_type, r.name as room,
                        s.start_time, s.end_time, l.subgroup, g.name as group_name
                 FROM lessons l
                 JOIN sessions s ON l.session_id = s.id
@@ -171,7 +167,7 @@ namespace StankinAppDatabase
 
             using var command = connection.CreateCommand();
             command.CommandText = @"
-                SELECT l.subject, t.name as teacher, l.lesson_type, r.name as room, 
+                SELECT l.subject, t.name as teacher, l.lesson_type, r.name as room,
                        s.start_time, s.end_time, l.subgroup, g.name as group_name
                 FROM lessons l
                 JOIN sessions s ON l.session_id = s.id

@@ -58,7 +58,7 @@ def getSectors(cells) -> []:
         if cells[currentRow][0].text == '':
             # вставлять со смещением потому что ячейка разделена горизонтально
             delta += 1
-        
+
         alreadyRepeatedPrev = False
         while currentCol < len(cellsInRow):
             if repeatPrev:
@@ -80,7 +80,7 @@ def getSectors(cells) -> []:
         currentRow += 1
     return sectors
 
-daysOfWeek: dict = { 
+daysOfWeek: dict = {
     1: "Понедельник",
     2: "Вторник",
     3: "Среда",
@@ -117,7 +117,7 @@ def extractFinalData(cells):
 
         # sorted by time
         todaySectors = sorted([s for s in sectors if s.dayOfWeek == day], key=lambda s: s.time)
-        
+
         todayTimeTable = {
             "8:30-10:10": [],
             "10:20-12:00": [],
@@ -152,8 +152,8 @@ def extractByFilename(filename):
 
 # https://edu.stankin.ru/course/view.php?id=11557
 print("folder path: ")
-folder: str = input()
-
+# folder: str = input()
+folder: str = '/home/dmff/repos/StankinApp/pdfparser/pdf'
 filenames = os.listdir(folder)
 
 for filename in filenames:
