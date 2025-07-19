@@ -1,0 +1,17 @@
+meta {
+  name: get_schedule
+  type: http
+  seq: 4
+}
+
+get {
+  url: http://localhost:5001/api/schedule/group/range?groupName=Группа1&startDate=01.09.2025&endDate=15.09.2025
+  body: none
+  auth: inherit
+}
+
+params:query {
+  groupName: Группа1
+  startDate: 01.09.2025
+  endDate: 15.09.2025
+}

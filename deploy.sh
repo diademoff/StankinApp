@@ -43,3 +43,5 @@ dotnet publish --output ../../dbBuilder
 cd ../../dbBuilder
 
 ./StankinAppDatabase --path ../pdfparser/json/ --year 2025
+
+cp dbBuilder/schedule.db StankinAppDatabase/StankinAppApi

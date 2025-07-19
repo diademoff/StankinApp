@@ -6,11 +6,13 @@ namespace StankinAppDatabase
     {
         private readonly string _dbPath;
         private readonly ScheduleJsonReader _scheduleReader;
+        private readonly int _currentYear;
 
         public DatabaseBuilder(int currentYear, Func<ErrorParsingInfo, Course[]> parseError, string dbPath = "schedule.db")
         {
             _dbPath = dbPath;
             _scheduleReader = new ScheduleJsonReader(currentYear, parseError);
+            _currentYear = currentYear;
         }
 
         public void CreateSchema()
@@ -159,7 +161,7 @@ namespace StankinAppDatabase
 
                 foreach (var date in course.Dates)
                 {
-                    dateParam.Value = date.ToString("dd.MM", null);
+                    dateParam.Value = date.ToString("dd.MM", null) + $".{_currentYear}";
                     command.ExecuteNonQuery();
                 }
             }

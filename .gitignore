@@ -456,3 +456,4 @@ $RECYCLE.BIN/
 pdfparser/json/*
 pdfparser/pdf/*
 dbBuilder/
+StankinAppDatabase/StankinAppApi/schedule.db
