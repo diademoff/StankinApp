@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Расписание</title>
+    <script src="static/alpine.js" defer></script>
+    <script src="static/tailwind3.4.3.js"></script>
+</head>
+
+<body class="h-full bg-gray-100 text-gray-800" x-data="scheduleApp()" x-init="init()">
+    <div class="max-w-xl mx-auto py-10 px-4">
+        <template x-if="!selectedGroup">
+            <div>
+                <h1 class="text-2xl font-bold mb-4">Выбери группу</h1>
+                <template x-if="groups.length === 0">
+                    <p>Загрузка групп...</p>
+                </template>
+                <template x-if="groups.length > 0">
+                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                        <template x-for="group in groups" :key="group">
+                            <button @click="selectGroup(group)"
+                                class="bg-white shadow hover:shadow-lg rounded-xl p-4 text-center text-sm font-medium transition-all duration-150 hover:bg-blue-50 active:scale-95">
+                                <span x-text="group"></span>
+                            </button>
+                        </template>
+                    </div>
+                </template>
+            </div>
+        </template>
+
+        <template x-if="selectedGroup">
+            <div>
+                <h1 class="text-xl font-semibold mb-2">Группа: <span x-text="selectedGroup"></span></h1>
+                <button class="mb-4 text-sm text-blue-500 underline" @click="reset()">сменить группу</button>
+
+                <!-- Заглушка расписания -->
+                <div class="bg-white p-4 rounded shadow">
+                    <p>Заглушка расписания для <strong x-text="selectedGroup"></strong></p>
+                </div>
+            </div>
+        </template>
+    </div>
+
+    <script src="config.js"></script>
+    <script>
+        function scheduleApp() {
+            return {
+                groups: [],
+                selectedGroup: null,
+
+                init() {
+                    this.selectedGroup = localStorage.getItem('group') || null;
+                    if (!this.selectedGroup) this.fetchGroups();
+                },
+
+                fetchGroups() {
+                    fetch(`${window.API_BASE_URL}/api/groups`)
+                        .then(r => r.json())
+                        .then(data => {
+                            this.groups = data;
+                        })
+                        .catch(() => {
+                            this.groups = [];
+                        });
+                },
+
+                selectGroup(group) {
+                    this.selectedGroup = group;
+                    localStorage.setItem('group', group);
+                },
+
+                reset() {
+                    this.selectedGroup = null;
+                    localStorage.removeItem('group');
+                    this.fetchGroups();
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>

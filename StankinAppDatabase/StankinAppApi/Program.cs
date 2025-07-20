@@ -3,6 +3,7 @@
     class Program
     {
         private static readonly string PATH = Path.GetFullPath("schedule.db");
+        const string FRONTEND_ADDRESS = "http://127.0.0.1:5500";
 
         static void Main(string[] args)
         {
@@ -13,7 +14,19 @@
                 options.Limits.MaxRequestBodySize = 10 * 1024 * 1024; // 10 мб
                 options.AddServerHeader = false; // убрать заголовок Server
             });
+            // 👇 добавляем политику CORS
+            appBuilder.Services.AddCors(options =>
+            {
+                options.AddPolicy("AllowFrontend", policy =>
+                {
+                    policy.WithOrigins(FRONTEND_ADDRESS) // адрес фронта
+                        .AllowAnyHeader()
+                        .AllowAnyMethod();
+                    // policy.AllowAnyOrigin();
+                });
+            });
             var app = appBuilder.Build();
+            app.UseCors("AllowFrontend"); // применяем политику
 
             var db = new StankinAppDatabase.DatabaseReader(PATH);
 
