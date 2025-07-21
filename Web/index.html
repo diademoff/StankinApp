@@ -35,9 +35,35 @@
                 <h1 class="text-xl font-semibold mb-2">Группа: <span x-text="selectedGroup"></span></h1>
                 <button class="mb-4 text-sm text-blue-500 underline" @click="reset()">сменить группу</button>
 
-                <!-- Заглушка расписания -->
-                <div class="bg-white p-4 rounded shadow">
-                    <p>Заглушка расписания для <strong x-text="selectedGroup"></strong></p>
+                <!-- Расписание -->
+                <div x-data="scheduleComponent()" x-init="init()" class="space-y-6">
+                    <template x-if="loading">
+                        <p class="text-gray-600">Загрузка расписания...</p>
+                    </template>
+                    <template x-if="error">
+                        <p class="text-red-500" x-text="error"></p>
+                    </template>
+                    <template x-if="!loading && schedule.length === 0 && !error">
+                        <p>Расписание не найдено.</p>
+                    </template>
+                    <template x-for="(day, date) in groupedSchedule" :key="date">
+                        <div>
+                            <h2 class="text-lg font-semibold mb-2" x-text="formatDate(date)"></h2>
+                            <div class="space-y-4">
+                                <template x-for="lesson in day" :key="lesson.startTime.hour + lesson.startTime.minute + lesson.subject">
+                                    <div :class="getLessonClass(lesson.type)" class="p-4 rounded shadow">
+                                        <p class="font-medium" x-text="lesson.subject"></p>
+                                        <p x-text="formatTime(lesson.startTime) + ' - ' + formatTime(calculateEndTime(lesson.startTime, lesson.duration))"></p>
+                                        <p x-text="lesson.teacher || 'Не указан'"></p>
+                                        <p x-text="lesson.cabinet"></p>
+                                        <p x-text="lesson.type"></p>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </template>
+                    <div x-ref="loadMoreTop" class="h-10"></div>
+                    <div x-ref="loadMoreBottom" class="h-10"></div>
                 </div>
             </div>
         </template>
@@ -75,6 +101,136 @@
                     this.selectedGroup = null;
                     localStorage.removeItem('group');
                     this.fetchGroups();
+                }
+            }
+        }
+
+        function scheduleComponent() {
+            return {
+                schedule: [],
+                groupedSchedule: {},
+                loading: false,
+                error: null,
+                currentStartDate: new Date(),
+                currentEndDate: new Date(),
+                groupName: '',
+
+                init() {
+                    this.groupName = localStorage.getItem('group');
+                    if (this.groupName) {
+                        this.loadSchedule();
+                    }
+                    this.setupScrollListener();
+                },
+
+                setupScrollListener() {
+                    window.addEventListener('scroll', () => {
+                        const topElement = this.$refs.loadMoreTop;
+                        const bottomElement = this.$refs.loadMoreBottom;
+                        if (topElement.getBoundingClientRect().bottom <= window.innerHeight) {
+                            this.loadMore('top');
+                        }
+                        if (bottomElement.getBoundingClientRect().top <= window.innerHeight) {
+                            this.loadMore('bottom');
+                        }
+                    });
+                },
+
+                loadMore(direction) {
+                    if (this.loading) return;
+                    this.loading = true;
+                    const newStartDate = new Date(this.currentStartDate);
+                    const newEndDate = new Date(this.currentEndDate);
+                    if (direction === 'top') {
+                        newStartDate.setDate(newStartDate.getDate() - 7);
+                    } else {
+                        newEndDate.setDate(newEndDate.getDate() + 7);
+                    }
+                    this.fetchSchedule(newStartDate, newEndDate, direction);
+                },
+
+                loadSchedule() {
+                    this.loading = true;
+                    this.error = null;
+                    const startDate = new Date();
+                    startDate.setDate(startDate.getDate() - 7);
+                    const endDate = new Date();
+                    endDate.setDate(endDate.getDate() + 7);
+                    this.currentStartDate = startDate;
+                    this.currentEndDate = endDate;
+                    this.fetchSchedule(startDate, endDate);
+                },
+
+                fetchSchedule(startDate, endDate, direction = 'initial') {
+                    const url = `${window.API_BASE_URL}/api/schedule?groupName=${encodeURIComponent(this.groupName)}&startDate=${this.formatDateForApi(startDate)}&endDate=${this.formatDateForApi(endDate)}`;
+                    fetch(url)
+                        .then(r => {
+                            if (!r.ok) throw new Error('Ошибка загрузки расписания');
+                            return r.json();
+                        })
+                        .then(data => {
+                            if (direction === 'top') {
+                                this.schedule = [...data, ...this.schedule];
+                            } else if (direction === 'bottom') {
+                                this.schedule = [...this.schedule, ...data];
+                            } else {
+                                this.schedule = data;
+                            }
+                            this.groupScheduleByDate();
+                            this.loading = false;
+                            this.error = null;
+                        })
+                        .catch(err => {
+                            this.loading = false;
+                            this.error = err.message;
+                        });
+                },
+
+                groupScheduleByDate() {
+                    this.groupedSchedule = this.schedule.reduce((acc, lesson) => {
+                        const date = lesson.dates[0].year + '-' + String(lesson.dates[0].month).padStart(2, '0') + '-' + String(lesson.dates[0].day).padStart(2, '0');
+                        if (!acc[date]) acc[date] = [];
+                        acc[date].push(lesson);
+                        return acc;
+                    }, {});
+                },
+
+                formatDate(dateString) {
+                    const date = new Date(dateString);
+                    const options = { weekday: 'long', day: 'numeric', month: 'long' };
+                    return date.toLocaleDateString('ru-RU', options);
+                },
+
+                formatTime(time) {
+                    const hour = time.hour.toString().padStart(2, '0');
+                    const minute = time.minute.toString().padStart(2, '0');
+                    return `${hour}:${minute}`;
+                },
+
+                calculateEndTime(startTime, duration) {
+                    const start = new Date(0, 0, 0, startTime.hour, startTime.minute);
+                    const end = new Date(start.getTime() + duration.minutes * 60000 + duration.hours * 3600000);
+                    return { hour: end.getHours(), minute: end.getMinutes() };
+                },
+
+                formatDateForApi(date) {
+                    const day = String(date.getDate()).padStart(2, '0');
+                    const month = String(date.getMonth() + 1).padStart(2, '0');
+                    const year = date.getFullYear();
+                    return `${day}.${month}.${year}`;
+                },
+
+                getLessonClass(type) {
+                    switch (type) {
+                        case 'лекции':
+                            return 'bg-blue-100';
+                        case 'семинар':
+                            return 'bg-green-100';
+                        case 'лабораторная работа':
+                            return 'bg-yellow-100';
+                        default:
+                            return 'bg-gray-100';
+                    }
                 }
             }
         }
