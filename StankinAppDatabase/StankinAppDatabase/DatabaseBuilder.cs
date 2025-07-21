@@ -157,11 +157,16 @@ namespace StankinAppDatabase
                     VALUES (@lesson_id, @date)";
                 command.Parameters.Clear();
                 command.Parameters.AddWithValue("@lesson_id", lessonId);
-                var dateParam = command.Parameters.Add("@date", SqliteType.Text);
+                // создаём параметр как TEXT
+                var dateParam = command.Parameters
+                    .Add("@date", Microsoft.Data.Sqlite.SqliteType.Text);
 
                 foreach (var date in course.Dates)
                 {
-                    dateParam.Value = date.ToString("dd.MM", null) + $".{_currentYear}";
+                    // формируем ISO‑строку "yyyy-MM-dd"
+                    // в запросах BETWEEN '2025-07-14' AND '2025-07-28' отработает корректно.
+                    dateParam.Value = new DateTime(_currentYear, date.Month, date.Day)
+                                          .ToString("yyyy-MM-dd");
                     command.ExecuteNonQuery();
                 }
             }

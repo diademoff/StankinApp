@@ -1,4 +1,5 @@
-﻿using Microsoft.Data.Sqlite;
+﻿using System.Globalization;
+using Microsoft.Data.Sqlite;
 using NodaTime;
 using NodaTime.Text;
 
@@ -49,7 +50,7 @@ namespace StankinAppDatabase
                 ORDER BY s.start_time";
 
             command.Parameters.AddWithValue("@groupName", groupName);
-            command.Parameters.AddWithValue("@date", date.ToString("dd.MM", null));
+            command.Parameters.AddWithValue("@date", date.ToDateTimeUnspecified().ToString("yyyy-MM-dd"));
 
             var s = command.CommandText.ToString();
 
@@ -159,7 +160,7 @@ namespace StankinAppDatabase
             return teachers;
         }
 
-public List<Course> GetScheduleForGroupInRange(string groupName, string startDate, string endDate)
+        public List<Course> GetScheduleForGroupInRange(string groupName, string startDate, string endDate)
         {
             var courses = new List<Course>();
             using var connection = new SqliteConnection($"Data Source={_dbPath}");
@@ -180,8 +181,19 @@ public List<Course> GetScheduleForGroupInRange(string groupName, string startDat
                 ORDER BY sd.date, s.start_time";
 
             command.Parameters.AddWithValue("@groupName", groupName);
-            command.Parameters.AddWithValue("@startDate", startDate);
-            command.Parameters.AddWithValue("@endDate", endDate);
+
+            if (!DateTime.TryParseExact(startDate, "yyyy-MM-dd",
+                 CultureInfo.InvariantCulture, DateTimeStyles.None, out var start))
+                throw new ArgumentException("startDate в неверном формате, ожидается yyyy-MM-dd");
+
+            if (!DateTime.TryParseExact(endDate, "yyyy-MM-dd",
+                 CultureInfo.InvariantCulture, DateTimeStyles.None, out var end))
+                throw new ArgumentException("endDate в неверном формате, ожидается yyyy-MM-dd");
+
+            // дальше тот же SQL, но параметры ISO‑строки
+            command.Parameters.AddWithValue("@startDate", start.ToString("yyyy-MM-dd"));
+            command.Parameters.AddWithValue("@endDate", end.ToString("yyyy-MM-dd"));
+
 
             using var reader = command.ExecuteReader();
             while (reader.Read())
@@ -192,12 +204,12 @@ public List<Course> GetScheduleForGroupInRange(string groupName, string startDat
                 var endTime = LocalTimePattern.CreateWithInvariantCulture("HH:mm").Parse(endTimeStr).Value;
                 var duration = Period.Between(startTime, endTime);
 
-                var dateStr = reader.GetString(8); // sd.date in "dd.MM.yyyy"
-                var dateParts = dateStr.Split('.');
-                var day = int.Parse(dateParts[0]);
-                var month = int.Parse(dateParts[1]);
-                var year = int.Parse(dateParts[2]);
-                var parsedDate = new LocalDate(year, month, day);
+                var dateStr = reader.GetString(8);
+                if (!DateTime.TryParseExact(dateStr, "yyyy-MM-dd",
+                 CultureInfo.InvariantCulture, DateTimeStyles.None, out var dateFromDb))
+                    throw new ArgumentException("dateFromDb в неверном формате, ожидается yyyy-MM-dd");
+
+                var parsedDate = LocalDate.FromDateTime(dateFromDb);
 
                 courses.Add(new Course
                 {
