@@ -54,17 +54,16 @@
                     </div>
 
                     <!-- контейнер с прокруткой -->
-                    <div x-ref="scheduleContainer" class="overflow-y-auto max-h-[70vh]" style="position:relative;">
+                    <div x-ref="scheduleContainer" class="overflow-y-auto max-h-[70vh] relative">
+                        <!-- индикатор загрузки сверху -->
+                        <div x-show="loading && loadingDir==='top'" class="text-gray-600 text-center py-2">загрузка расписания...</div>
                         <div x-ref="loadMoreTop"></div>
 
-                        <template x-if="loading">
-                            <p class="text-gray-600 text-center">загрузка расписания...</p>
+                        <template x-if="!loading && schedule.length === 0 && !error">
+                            <p class="text-center">расписание не найдено.</p>
                         </template>
                         <template x-if="error">
                             <p class="text-red-500 text-center" x-text="error"></p>
-                        </template>
-                        <template x-if="!loading && schedule.length === 0 && !error">
-                            <p class="text-center">расписание не найдено.</p>
                         </template>
 
                         <template x-for="(day, date) in groupedSchedule" :key="date">
@@ -85,6 +84,8 @@
                         </template>
 
                         <div x-ref="loadMoreBottom"></div>
+                        <!-- индикатор загрузки снизу -->
+                        <div x-show="loading && loadingDir==='bottom'" class="text-gray-600 text-center py-2">загрузка расписания...</div>
                     </div>
                 </div>
             </div>
@@ -123,7 +124,7 @@
             return {
                 schedule: [], groupedSchedule: {}, loading: false, error: null,
                 currentStartDate: null, currentEndDate: null, dateRange: [], selectedDate: null,
-                observerTop: null, observerBottom: null,
+                observerTop: null, observerBottom: null, loadingDir: null, prevScrollHeight: 0,
                 init() {
                     const g = localStorage.getItem('group');
                     if (!g) return;
@@ -134,7 +135,7 @@
                     this.setupObservers();
                 },
                 setupObservers() {
-                    const opts = { root: this.$refs.scheduleContainer, threshold: 0 };
+                    const opts = { root: this.$refs.scheduleContainer, rootMargin: '100px', threshold: 0 };
                     this.observerTop = new IntersectionObserver((ents) => { if (ents[0].isIntersecting && !this.loading) this.loadMore('top'); }, opts);
                     this.observerBottom = new IntersectionObserver((ents) => { if (ents[0].isIntersecting && !this.loading) this.loadMore('bottom'); }, opts);
                     this.observerTop.observe(this.$refs.loadMoreTop);
@@ -142,18 +143,34 @@
                 },
                 loadMore(dir) {
                     this.loading = true;
+                    this.loadingDir = dir;
                     let s = new Date(this.currentStartDate), e = new Date(this.currentEndDate);
-                    if (dir === 'top') { s.setDate(s.getDate() - 7); this.fetchSchedule(s, this.currentStartDate, 'top'); }
-                    else { e.setDate(e.getDate() + 7); this.fetchSchedule(this.currentEndDate, e, 'bottom'); }
+                    if (dir === 'top') {
+                        this.prevScrollHeight = this.$refs.scheduleContainer.scrollHeight;
+                        s.setDate(s.getDate() - 7);
+                        this.fetchSchedule(s, this.currentStartDate, 'top');
+                    } else {
+                        e.setDate(e.getDate() + 7);
+                        this.fetchSchedule(this.currentEndDate, e, 'bottom');
+                    }
                 },
                 fetchSchedule(startDate, endDate, dir = 'initial') {
                     const params = `groupName=${encodeURIComponent(localStorage.getItem('group'))}&startDate=${this.formatDateForApi(startDate)}&endDate=${this.formatDateForApi(endDate)}`;
                     fetch(`${window.API_BASE_URL}/api/schedule?` + params)
                         .then(r => { if (!r.ok) throw Error('ошибка загрузки'); return r.json(); })
                         .then(data => {
-                            if (dir === 'top') { this.schedule = [...data, ...this.schedule]; this.currentStartDate = startDate; }
-                            else if (dir === 'bottom') { this.schedule = [...this.schedule, ...data]; this.currentEndDate = endDate; }
-                            else this.schedule = data;
+                            if (dir === 'top') {
+                                this.schedule = [...data, ...this.schedule];
+                                this.currentStartDate = startDate;
+                                Alpine.nextTick(() => {
+                                    this.$refs.scheduleContainer.scrollTop = this.$refs.scheduleContainer.scrollHeight - this.prevScrollHeight;
+                                });
+                            } else if (dir === 'bottom') {
+                                this.schedule = [...this.schedule, ...data];
+                                this.currentEndDate = endDate;
+                            } else {
+                                this.schedule = data;
+                            }
                             this.groupScheduleByDate(); this.updateDateRange();
                             this.loading = false; this.error = null;
                         })
