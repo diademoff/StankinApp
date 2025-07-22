@@ -11,7 +11,6 @@
 
 <body class="h-full bg-gray-100 text-gray-800" x-data="scheduleApp()" x-init="init()">
     <div class="max-w-xl mx-auto py-10 px-4">
-        <!-- выбор группы -->
         <template x-if="!selectedGroup">
             <div>
                 <h1 class="text-2xl font-bold mb-4">выбери группу</h1>
@@ -30,42 +29,36 @@
                 </template>
             </div>
         </template>
-
-        <!-- расписание -->
         <template x-if="selectedGroup">
             <div>
                 <h1 class="text-xl font-semibold mb-2">группа: <span x-text="selectedGroup"></span></h1>
                 <button class="mb-4 text-sm text-blue-500 underline" @click="reset()">сменить группу</button>
-
-                <div x-data="scheduleComponent()" x-init="init()" class="">
-                    <!-- datepicker + карусель -->
-                    <div class="flex items-center space-x-4 mb-4">
-                        <input type="date" x-model="selectedDate" @change="selectDate(selectedDate)"
-                            class="px-3 py-2 border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        <div class="flex overflow-x-auto space-x-2">
+                <div x-data="scheduleComponent()" x-init="init()">
+                    <div class="flex items-center justify-between mb-4">
+                        <button @click="prevWeek()" class="px-2 py-1 bg-white rounded shadow disabled:opacity-50"
+                            :disabled="loading">&lt;</button>
+                        <div class="flex space-x-2">
                             <template x-for="date in dateRange" :key="date">
-                                <button @click="selectDate(date)"
-                                    class="px-4 py-2 bg-white rounded shadow text-sm whitespace-nowrap"
-                                    :class="{'bg-blue-100': isSelectedDate(date), 'hover:bg-blue-50': !isSelectedDate(date)}">
+                                <button @click="onDateClick(date)" class="min-w-[40px] py-2 rounded shadow text-sm"
+                                    :class="isSelectedDate(date) ? 'bg-blue-100' : 'bg-white hover:bg-blue-50'"
+                                    :disabled="!hasSchedule(date) && loading">
                                     <span x-text="formatDateShort(date)"></span>
                                 </button>
                             </template>
                         </div>
+                        <button @click="nextWeek()" class="px-2 py-1 bg-white rounded shadow disabled:opacity-50"
+                            :disabled="loading">&gt;</button>
                     </div>
-
-                    <!-- контейнер с прокруткой -->
                     <div x-ref="scheduleContainer" class="overflow-y-auto max-h-[70vh] relative">
-                        <!-- индикатор загрузки сверху -->
-                        <div x-show="loading && loadingDir==='top'" class="text-gray-600 text-center py-2">загрузка расписания...</div>
+                        <div x-show="loading && loadingDir==='top'" class="text-gray-600 text-center py-2">загрузка
+                            расписания...</div>
                         <div x-ref="loadMoreTop"></div>
-
                         <template x-if="!loading && schedule.length === 0 && !error">
                             <p class="text-center">расписание не найдено.</p>
                         </template>
                         <template x-if="error">
                             <p class="text-red-500 text-center" x-text="error"></p>
                         </template>
-
                         <template x-for="(day, date) in groupedSchedule" :key="date">
                             <div :id="'date-' + date" class="mb-6">
                                 <h2 class="text-lg font-semibold mb-2" x-text="formatDate(date)"></h2>
@@ -73,7 +66,9 @@
                                     <template x-for="lesson in day" :key="lesson.subject + lesson.startTime.hour">
                                         <div :class="getLessonClass(lesson.type) + ' p-4 rounded shadow'">
                                             <p class="font-medium" x-text="lesson.subject"></p>
-                                            <p x-text="formatTime(lesson.startTime) + ' - ' + formatTime(calculateEndTime(lesson.startTime, lesson.duration))"></p>
+                                            <p
+                                                x-text="formatTime(lesson.startTime) + ' - ' + formatTime(calculateEndTime(lesson.startTime, lesson.duration))">
+                                            </p>
                                             <p x-text="lesson.teacher || 'не указан'"></p>
                                             <p x-text="lesson.cabinet"></p>
                                             <p x-text="lesson.type"></p>
@@ -82,69 +77,117 @@
                                 </div>
                             </div>
                         </template>
-
                         <div x-ref="loadMoreBottom"></div>
-                        <!-- индикатор загрузки снизу -->
-                        <div x-show="loading && loadingDir==='bottom'" class="text-gray-600 text-center py-2">загрузка расписания...</div>
+                        <div x-show="loading && loadingDir==='bottom'" class="text-gray-600 text-center py-2">загрузка
+                            расписания...</div>
                     </div>
                 </div>
             </div>
         </template>
     </div>
-
     <script src="config.js"></script>
     <script>
         function scheduleApp() {
             return {
-                groups: [],
-                selectedGroup: null,
-                init() {
-                    this.selectedGroup = localStorage.getItem('group') || null;
-                    if (!this.selectedGroup) this.fetchGroups();
-                },
-                fetchGroups() {
-                    fetch(`${window.API_BASE_URL}/api/groups`)
-                        .then(r => r.json())
-                        .then(data => this.groups = data)
-                        .catch(() => this.groups = []);
-                },
-                selectGroup(group) {
-                    this.selectedGroup = group;
-                    localStorage.setItem('group', group);
-                },
-                reset() {
-                    this.selectedGroup = null;
-                    localStorage.removeItem('group');
-                    this.fetchGroups();
-                }
+                groups: [], selectedGroup: null,
+                init() { this.selectedGroup = localStorage.getItem('group') || null; if (!this.selectedGroup) this.fetchGroups(); },
+                fetchGroups() { fetch(`${window.API_BASE_URL}/api/groups`).then(r => r.json()).then(data => this.groups = data).catch(() => this.groups = []); },
+                selectGroup(g) { this.selectedGroup = g; localStorage.setItem('group', g); },
+                reset() { localStorage.removeItem('group'); this.selectedGroup = null; this.fetchGroups(); }
             }
         }
-
         function scheduleComponent() {
             return {
-                schedule: [], groupedSchedule: {}, loading: false, error: null,
-                currentStartDate: null, currentEndDate: null, dateRange: [], selectedDate: null,
-                observerTop: null, observerBottom: null, loadingDir: null, prevScrollHeight: 0,
+                schedule: [],
+                groupedSchedule: {},
+                loading: false,
+                error: null,
+                currentStartDate: null,
+                currentEndDate: null,
+                dateRange: [],
+                selectedDate: null,
+                weekStart: null,
+                observerTop: null,
+                observerBottom: null,
+                loadingDir: null,
+                prevScrollHeight: 0,
                 init() {
                     const g = localStorage.getItem('group');
                     if (!g) return;
-                    this.currentStartDate = new Date(); this.currentStartDate.setDate(this.currentStartDate.getDate() - 7);
-                    this.currentEndDate = new Date(); this.currentEndDate.setDate(this.currentEndDate.getDate() + 7);
                     this.selectedDate = new Date().toISOString().split('T')[0];
-                    this.fetchSchedule(this.currentStartDate, this.currentEndDate, 'initial');
+                    this.weekStart = this.getWeekStart(new Date(this.selectedDate));
+                    this.updateDateRange();
+                    const start = new Date(this.weekStart);
+                    start.setDate(start.getDate() - 14);
+                    const end = new Date(this.weekStart);
+                    end.setDate(end.getDate() + 20);
+                    this.currentStartDate = start;
+                    this.currentEndDate = end;
+                    this.fetchSchedule(start, end, 'initial');
                     this.setupObservers();
                 },
+                getWeekStart(d) {
+                    const day = (d = new Date(d)).getDay();
+                    const diff = (day + 6) % 7;
+                    d.setDate(d.getDate() - diff);
+                    return d;
+                },
+                updateDateRange() {
+                    const arr = [];
+                    const d = new Date(this.weekStart);
+                    for (let i = 0; i < 7; i++) {
+                        arr.push(d.toISOString().split('T')[0]);
+                        d.setDate(d.getDate() + 1);
+                    }
+                    this.dateRange = arr;
+                },
+                prevWeek() {
+                    this.weekStart.setDate(this.weekStart.getDate() - 7);
+                    this.updateDateRange();
+                },
+                nextWeek() {
+                    this.weekStart.setDate(this.weekStart.getDate() + 7);
+                    this.updateDateRange();
+                },
+                onDateClick(date) {
+                    this.selectedDate = date;
+                    if (!this.groupedSchedule[date]) {
+                        const ws = this.getWeekStart(new Date(date));
+                        const s = new Date(ws);
+                        s.setDate(s.getDate());
+                        const e = new Date(ws);
+                        e.setDate(e.getDate() + 6);
+                        this.currentStartDate = s;
+                        this.currentEndDate = e;
+                        this.fetchSchedule(s, e, 'initial');
+                    }
+                    const el = document.getElementById('date-' + date);
+                    if (el) el.scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                },
+                hasSchedule(date) {
+                    return !!this.groupedSchedule[date];
+                },
+                isSelectedDate(date) {
+                    return this.selectedDate === date;
+                },
                 setupObservers() {
-                    const opts = { root: this.$refs.scheduleContainer, rootMargin: '100px', threshold: 0 };
-                    this.observerTop = new IntersectionObserver((ents) => { if (ents[0].isIntersecting && !this.loading) this.loadMore('top'); }, opts);
-                    this.observerBottom = new IntersectionObserver((ents) => { if (ents[0].isIntersecting && !this.loading) this.loadMore('bottom'); }, opts);
+                    const opts = {
+                        root: this.$refs.scheduleContainer,
+                        rootMargin: '100px',
+                        threshold: 0
+                    };
+                    this.observerTop = new IntersectionObserver(ents => ents[0].isIntersecting && !this.loading && this.loadMore('top'), opts);
+                    this.observerBottom = new IntersectionObserver(ents => ents[0].isIntersecting && !this.loading && this.loadMore('bottom'), opts);
                     this.observerTop.observe(this.$refs.loadMoreTop);
                     this.observerBottom.observe(this.$refs.loadMoreBottom);
                 },
                 loadMore(dir) {
                     this.loading = true;
                     this.loadingDir = dir;
-                    let s = new Date(this.currentStartDate), e = new Date(this.currentEndDate);
+                    let s = new Date(this.currentStartDate),
+                        e = new Date(this.currentEndDate);
                     if (dir === 'top') {
                         this.prevScrollHeight = this.$refs.scheduleContainer.scrollHeight;
                         s.setDate(s.getDate() - 7);
@@ -154,64 +197,74 @@
                         this.fetchSchedule(this.currentEndDate, e, 'bottom');
                     }
                 },
-                fetchSchedule(startDate, endDate, dir = 'initial') {
-                    const params = `groupName=${encodeURIComponent(localStorage.getItem('group'))}&startDate=${this.formatDateForApi(startDate)}&endDate=${this.formatDateForApi(endDate)}`;
-                    fetch(`${window.API_BASE_URL}/api/schedule?` + params)
-                        .then(r => { if (!r.ok) throw Error('ошибка загрузки'); return r.json(); })
-                        .then(data => {
-                            if (dir === 'top') {
-                                this.schedule = [...data, ...this.schedule];
-                                this.currentStartDate = startDate;
-                                Alpine.nextTick(() => {
-                                    this.$refs.scheduleContainer.scrollTop = this.$refs.scheduleContainer.scrollHeight - this.prevScrollHeight;
-                                });
-                            } else if (dir === 'bottom') {
-                                this.schedule = [...this.schedule, ...data];
-                                this.currentEndDate = endDate;
-                            } else {
-                                this.schedule = data;
-                            }
-                            this.groupScheduleByDate(); this.updateDateRange();
-                            this.loading = false; this.error = null;
-                        })
-                        .catch(err => { this.error = err.message; this.loading = false; });
-                },
-                selectDate(date) {
-                    this.selectedDate = date;
-                    const t = new Date(date), s = new Date(t), e = new Date(t);
-                    s.setDate(t.getDate() - 7); e.setDate(t.getDate() + 7);
-                    this.currentStartDate = s; this.currentEndDate = e;
-                    this.fetchSchedule(s, e);
-                    setTimeout(() => {
-                        const el = document.getElementById('date-' + date);
-                        if (el) el.scrollIntoView({ behavior: 'smooth' });
-                    }, 300);
+                fetchSchedule(s, e, dir) {
+                    const params = `groupName=${encodeURIComponent(localStorage.getItem('group'))}&startDate=${this.formatDateForApi(s)}&endDate=${this.formatDateForApi(e)}`;
+                    fetch(`${window.API_BASE_URL}/api/schedule?` + params).then(r => {
+                        if (!r.ok) throw Error('ошибка загрузки');
+                        return r.json()
+                    }).then(data => {
+                        if (dir === 'top') {
+                            this.schedule = [...data, ...this.schedule];
+                            this.currentStartDate = s;
+                            Alpine.nextTick(() => {
+                                this.$refs.scheduleContainer.scrollTop = this.$refs.scheduleContainer.scrollHeight - this.prevScrollHeight;
+                            });
+                        } else if (dir === 'bottom') {
+                            this.schedule = [...this.schedule, ...data];
+                            this.currentEndDate = e;
+                        } else {
+                            this.schedule = data;
+                        }
+                        this.groupScheduleByDate();
+                        this.loading = false;
+                        this.error = null;
+                    }).catch(err => {
+                        this.error = err.message;
+                        this.loading = false;
+                    });
                 },
                 groupScheduleByDate() {
                     this.groupedSchedule = this.schedule.reduce((a, l) => {
                         const d = l.dates[0];
-                        const key = `${d.year}-${String(d.month).padStart(2,'0')}-${String(d.day).padStart(2,'0')}`;
-                        (a[key] || (a[key]=[])).push(l);
+                        const key = `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
+                        (a[key] || (a[key] = [])).push(l);
                         return a;
                     }, {});
                 },
-                updateDateRange() {
-                    const arr = [], s = new Date(this.currentStartDate), e = new Date(this.currentEndDate);
-                    while (s <= e) { arr.push(s.toISOString().split('T')[0]); s.setDate(s.getDate()+1); }
-                    this.dateRange = arr;
+                formatDate(d) {
+                    const x = new Date(d);
+                    return x.toLocaleDateString('ru-RU', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long'
+                    });
                 },
-                formatDate(dateStr) {
-                    const d = new Date(dateStr);
-                    return d.toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
+                formatDateShort(d) {
+                    const x = new Date(d);
+                    const m = ['янв.', 'фев.', 'мар.', 'апр.', 'май', 'июн.', 'июл.', 'авг.', 'сен.', 'окт.', 'ноя.', 'дек.'];
+                    return `${x.getDate()} ${m[x.getMonth()]}`;
                 },
-                formatDateShort(dateStr) {
-                    const d = new Date(dateStr);
-                    return `${d.getDate()}.${d.getMonth()+1}`;
+                formatTime(t) {
+                    return String(t.hour).padStart(2, '0') + ':' + String(t.minute).padStart(2, '0');
                 },
-                formatTime(t) { return String(t.hour).padStart(2,'0')+':'+String(t.minute).padStart(2,'0'); },
-                calculateEndTime(s,d){const st=new Date(0,0,0,s.hour,s.minute);const en=new Date(st.getTime()+d.hours*3600000+d.minutes*60000);return{hour:en.getHours(),minute:en.getMinutes()};},
-                formatDateForApi(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;},
-                getLessonClass(type){return{'лекции':'bg-blue-100','семинар':'bg-green-100','лабораторная работа':'bg-yellow-100'}[type]||'bg-gray-100';}
+                calculateEndTime(s, d) {
+                    const st = new Date(0, 0, 0, s.hour, s.minute);
+                    const en = new Date(st.getTime() + d.hours * 3600000 + d.minutes * 60000);
+                    return {
+                        hour: en.getHours(),
+                        minute: en.getMinutes()
+                    };
+                },
+                formatDateForApi(d) {
+                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                },
+                getLessonClass(t) {
+                    return {
+                        'лекции': 'bg-blue-100',
+                        'семинар': 'bg-green-100',
+                        'лабораторная работа': 'bg-yellow-100'
+                    }[t] || 'bg-gray-100';
+                }
             }
         }
     </script>
