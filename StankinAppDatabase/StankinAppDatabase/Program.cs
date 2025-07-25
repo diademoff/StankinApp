@@ -70,7 +70,7 @@ namespace StankinAppDatabase
             Console.WriteLine("База данных не найдена. Создание новой базы данных...");
             var HandleParseError = HandleErrorMethods.HandleParseError2025;
             HandleErrorMethods.year = year;
-            DatabaseBuilder builder = new DatabaseBuilder(DateTime.Now.Year, HandleParseError, DB_PATH);
+            DatabaseBuilder builder = new DatabaseBuilder(year, HandleParseError, DB_PATH);
 
             _reader = new ScheduleJsonReader(year, null);
             //Create database schema
