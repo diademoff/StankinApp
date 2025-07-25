@@ -2,12 +2,13 @@ using Terminal.Gui;
 using NodaTime;
 using NodaTime.Text;
 using System.Globalization;
+using StankinAppCore;
 
 namespace StankinAppDatabase
 {
     public class UI
     {
-        private readonly DatabaseReader _builder;
+        private readonly IDataReader _reader;
         private List<string> _groups;
         private ListView _groupsListView;
         private ListView _scheduleListView;
@@ -25,7 +26,7 @@ namespace StankinAppDatabase
 
         public UI(DatabaseReader reader)
         {
-            _builder = reader;
+            _reader = reader;
         }
 
         public void Run()
@@ -72,7 +73,7 @@ namespace StankinAppDatabase
             // Вкладка "Группы"
             try
             {
-                _groups = _builder.GetGroups();
+                _groups = _reader.GetGroups().ToList();
                 var groupsListView = new ListView
                 {
                     Width = Dim.Fill(),
@@ -92,7 +93,7 @@ namespace StankinAppDatabase
             // Вкладка "Кабинеты"
             try
             {
-                _rooms = _builder.GetRooms();
+                _rooms = _reader.GetRooms().ToList();
                 var roomsListView = new ListView
                 {
                     Width = Dim.Fill(),
@@ -112,7 +113,7 @@ namespace StankinAppDatabase
             // Вкладка "Преподаватели"
             try
             {
-                _teachers = _builder.GetTeachers();
+                _teachers = _reader.GetTeachers().ToList();
                 var teachersListView = new ListView
                 {
                     Width = Dim.Fill(),
@@ -244,27 +245,47 @@ namespace StankinAppDatabase
             {
                 if (_teachersListView.SelectedItem == -1) return;
                 var selectedTeacher = _teachers[_teachersListView.SelectedItem];
-                var localDate = new LocalDate(_dateField.Date.Year, _dateField.Date.Month, _dateField.Date.Day);
-                courses = _builder.GetScheduleForTeacher(selectedTeacher, localDate);
+                var dateStr = new LocalDate(_dateField.Date.Year, _dateField.Date.Month, _dateField.Date.Day).ToString("yyyy-MM-dd", null);
+                courses = _reader.GetScheduleForTeacher(selectedTeacher, dateStr, dateStr).ToList();
             }
             else if (!_isRoomSelected)
             {
                 if (_groupsListView.SelectedItem == -1) return;
                 var selectedGroup = _groups[_groupsListView.SelectedItem];
-                var localDate = new LocalDate(_dateField.Date.Year, _dateField.Date.Month, _dateField.Date.Day);
-                courses = _builder.GetScheduleForGroup(selectedGroup, localDate);
+                var dateStr = new LocalDate(_dateField.Date.Year, _dateField.Date.Month, _dateField.Date.Day).ToString("yyyy-MM-dd", null);
+                courses = _reader.GetScheduleForGroup(selectedGroup, dateStr, dateStr).ToList();
             }
             else
             {
                 if (_roomsListView.SelectedItem == -1) return;
                 var selectedRoom = _rooms[_roomsListView.SelectedItem];
-                var localDate = new LocalDate(_dateField.Date.Year, _dateField.Date.Month, _dateField.Date.Day);
-                courses = _builder.GetScheduleForRoom(selectedRoom, localDate);
+                var dateStr = new LocalDate(_dateField.Date.Year, _dateField.Date.Month, _dateField.Date.Day).ToString("yyyy-MM-dd", null);
+                courses = _reader.GetScheduleForRoom(selectedRoom, dateStr, dateStr).ToList();
             }
 
             if (courses.Count == 0)
             {
-                _scheduleListView.SetSource(new List<string>());
+                _scheduleListView.SetSource(new List<string>());            if (_isTeacherSelected)
+            {
+                if (_teachersListView.SelectedItem == -1) return;
+                var selectedTeacher = _teachers[_teachersListView.SelectedItem];
+                var dateStr = new LocalDate(_dateField.Date.Year, _dateField.Date.Month, _dateField.Date.Day).ToString("yyyy-MM-dd", null);
+                courses = _reader.GetScheduleForTeacher(selectedTeacher, dateStr, dateStr).ToList();
+            }
+            else if (!_isRoomSelected)
+            {
+                if (_groupsListView.SelectedItem == -1) return;
+                var selectedGroup = _groups[_groupsListView.SelectedItem];
+                var dateStr = new LocalDate(_dateField.Date.Year, _dateField.Date.Month, _dateField.Date.Day).ToString("yyyy-MM-dd", null);
+                courses = _reader.GetScheduleForGroup(selectedGroup, dateStr, dateStr).ToList();
+            }
+            else
+            {
+                if (_roomsListView.SelectedItem == -1) return;
+                var selectedRoom = _rooms[_roomsListView.SelectedItem];
+                var dateStr = new LocalDate(_dateField.Date.Year, _dateField.Date.Month, _dateField.Date.Day).ToString("yyyy-MM-dd", null);
+                courses = _reader.GetScheduleForRoom(selectedRoom, dateStr, dateStr).ToList();
+            }
                 return;
             }
 

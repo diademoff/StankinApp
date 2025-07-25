@@ -1,33 +1,34 @@
 ﻿using NodaTime;
+using StankinAppCore;
 
 namespace StankinAppDatabase
 {
     public static class HandleErrorMethods
     {
-        static ScheduleJsonReader _reader;
+        static ScheduleJsonReader? _reader;
         public static int year = DateTime.Now.Year;
 
 
         readonly static string[] SubjectNamesWithDots =
-        {
+        [
             "Технологии индустрии 4.0"
-        };
+        ];
 
         readonly static Tuple<string, string>[] AnomalyTeachers =
         {
             // Что искать / На что менять
-                                    
-            new Tuple<string, string>("Амир Абдаллах Д. А.  . .", "Амир Абдаллах Д. А."),
-            new Tuple<string, string>("Юсеф Фарах  . .", "Юсеф Фарах"),
-            new Tuple<string, string>("Мохаммад Раша  . .", "Мохаммад Раша"),
-            new Tuple<string, string>("Агоштинью Адау Какулу . .", "Агоштинью Адау Какулу"),
-            new Tuple<string, string>("Агоштинью Адау Какулу  . .", "Агоштинью Адау Какулу"), // да, два пробела
+
+            new("Амир Абдаллах Д. А.  . .", "Амир Абдаллах Д. А."),
+            new("Юсеф Фарах  . .", "Юсеф Фарах"),
+            new("Мохаммад Раша  . .", "Мохаммад Раша"),
+            new("Агоштинью Адау Какулу . .", "Агоштинью Адау Какулу"),
+            new("Агоштинью Адау Какулу  . .", "Агоштинью Адау Какулу"), // да, два пробела
         };
 
         public static Course[] HandleParseError2025(ErrorParsingInfo err)
         {
-            if (_reader is null)
-                _reader = new ScheduleJsonReader(year, null);
+            _reader ??= new ScheduleJsonReader(year, (_) => []);
+
             // Обработка названий предметов с точкой в названии
             var subjectNameWithDots = SubjectNamesWithDots.Where(x => err.LineToParse.Contains(x));
             var subjectNameWithDotExists = subjectNameWithDots.Any();
@@ -110,7 +111,7 @@ namespace StankinAppDatabase
                 string? cabinet = Console.ReadLine();
 
                 Console.Write("Даты [00.00-00.00 к.н./ч.н.]: ");
-                string? date_str = Console.ReadLine();
+                string? date_str = Console.ReadLine() ?? throw new NullReferenceException("date_str is null");
                 var dates = _reader.ParseSchedule(date_str, year);
 
                 // Создаём объект Course
@@ -130,7 +131,7 @@ namespace StankinAppDatabase
                 courses.Add(course);
             }
 
-            return courses.ToArray();
+            return [.. courses];
         }
     }
 }

@@ -1,60 +1,18 @@
 using Newtonsoft.Json.Linq;
 using NodaTime;
 using NodaTime.Text;
+using StankinAppCore;
 using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace StankinAppDatabase
 {
-    public struct Course
-    {
-        public LocalTime StartTime { get; set; }
-        public Period? Duration { get; set; }
-        public List<LocalDate>? Dates { get; set; }
-        public string? GroupName { get; set; }
-        public string? Subject { get; set; }
-        public string? Teacher { get; set; }
-        public string? Type { get; set; }
-        public string? Subgroup { get; set; }
-        public string? Cabinet { get; set; }
-
-        public override string ToString()
-        {
-            if (Duration is null || Dates is null)
-                throw new Exception("Course Duration or Dates is null");
-            var endTime = StartTime + Duration;
-            var dates = string.Join(", ", Dates.Select(d => d.ToString("dd.MM", null)));
-            var subgroupInfo = !string.IsNullOrEmpty(Subgroup) ? $" ({Subgroup})" : "";
-            var cabinetInfo = !string.IsNullOrEmpty(Cabinet) ? $" в {Cabinet}" : "";
-
-            return $"{StartTime:HH:mm}-{endTime:HH:mm} | {Subject}{subgroupInfo} | {Type} | {Teacher}{cabinetInfo} | {dates}";
-        }
-    }
-
-    public class Schedule
-    {
-        public string GroupName { get; private set; }
-        public List<Course> Days { get; private set; }
-
-        public Schedule(string groupName, List<Course> days)
-        {
-            Days = days ?? throw new ArgumentNullException(nameof(days));
-            GroupName = groupName;
-        }
-    }
-    
-    public class ScheduleJsonReader
+    public class ScheduleJsonReader(int currentYear, Func<ErrorParsingInfo, Course[]> parseError)
     {
         private static readonly HashSet<string> AllowedLessonTypes = ["лекции", "семинар", "лабораторные занятия"];
-        int currentYear;
+        int currentYear = currentYear;
 
-        Func<ErrorParsingInfo, Course[]> parseError;
-
-        public ScheduleJsonReader(int currentYear, Func<ErrorParsingInfo, Course[]> parseError)
-        {
-            this.currentYear = currentYear;
-            this.parseError = parseError;
-        }
+        readonly Func<ErrorParsingInfo, Course[]> parseError = parseError;
 
         public Schedule GetSchedule(string groupName, string fileJson)
         {
@@ -63,7 +21,8 @@ namespace StankinAppDatabase
 
             foreach (var day in data.Properties())
             {
-                foreach (var timeInterval in day.Value.ToObject<JObject>().Properties())
+                foreach (var timeInterval in (day.Value.ToObject<JObject>() ?? throw new NullReferenceException($"{nameof(day)} timeInterval is null "))
+                                                .Properties())
                 {
                     string[] timeParts = timeInterval.Name.Split('-');
                     if (timeParts.Length != 2)
@@ -93,8 +52,10 @@ namespace StankinAppDatabase
 
                     Period duration = endTime - startTime;
 
-                    foreach (var lessonLine in timeInterval.Value.ToObject<List<string>>())
+                    List<string>? list = timeInterval.Value.ToObject<List<string>>();
+                    for (int i = 0; i < list?.Count; i++)
                     {
+                        string? lessonLine = list[i];
                         List<Course> parsedLessons = ParseLessons(lessonLine, startTime, duration, groupName);
                         courses.AddRange(parsedLessons);
                     }
@@ -109,7 +70,7 @@ namespace StankinAppDatabase
         /// </summary>
         private static MatchCollection? GetCoursesInString(string rowString)
         {
-            // шаблон для всей записи: 
+            // шаблон для всей записи:
             var pattern = @"(?<subject>[^\.]+)\.\s*" +
                       @"(?:(?<teacher>[А-ЯЁ][^\.]+\s+[А-Я]\.(?:\s*[А-Я]\.)?)\s*\.*\s*)?" +
                       @"(?<type>[^\.]+?)\.\s*" +
@@ -126,16 +87,18 @@ namespace StankinAppDatabase
                 return subject;
 
             // Используем регулярное выражение для поиска минуса, за которым следует пробел, и заменяем на минус без пробела
-            return System.Text.RegularExpressions.Regex.Replace(subject, @"-\s+", "-");
+            return Regex.Replace(subject, @"-\s+", "-");
         }
 
         public List<Course> ParseLessons(string lessonLine, LocalTime startTime, Period duration, string groupName, bool throwOnFail=false)
         {
-            // lessonLine example: 
+            if (lessonLine is null)
+                throw new NullReferenceException($"{nameof(lessonLine)} is null");
+            // lessonLine example:
             // Интеграция информационных систем и технологий. Тихомирова В.Д. лабораторные занятия. (А). 249(б). [26.03-23.04 ч.н., 14.05]
-            MatchCollection matches = GetCoursesInString(lessonLine);
+            MatchCollection? matches = GetCoursesInString(lessonLine);
 
-            if (matches == null) throw new ArgumentNullException();
+            if (matches is null) throw new NullReferenceException($"{nameof(matches)} is null");
 
             List<Course> entries = [];
             foreach (Match match in matches)
@@ -174,14 +137,14 @@ namespace StankinAppDatabase
             {
                 if (throwOnFail)
                     throw new Exception("Parsing failed");
-                return parseError(new ErrorParsingInfo()
+                return [.. parseError(new ErrorParsingInfo()
                 {
                     LineToParse = lessonLine,
                     GroupName = groupName,
                     StartTime = startTime,
                     Duration = duration
-                }).ToList();
-            }    
+                })];
+            }
 
             return entries;
         }

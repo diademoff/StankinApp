@@ -10,9 +10,11 @@
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="13.0.1" />
     <PackageReference Include="Terminal.Gui" Version="1.12.0" />
-    <PackageReference Include="NodaTime" Version="3.1.9" />
-    <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.2" />
     <PackageReference Include="System.CommandLine" Version="2.0.0-beta5.25306.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\StankinAppCore\StankinAppCore.csproj" />
   </ItemGroup>
 
 </Project>

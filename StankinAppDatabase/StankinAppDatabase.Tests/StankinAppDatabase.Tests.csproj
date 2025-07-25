@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\StankinAppDatabase\StankinAppDatabase.csproj" />
+    <ProjectReference Include="..\StankinAppCore\StankinAppCore.csproj" />
   </ItemGroup>
 
   <ItemGroup>

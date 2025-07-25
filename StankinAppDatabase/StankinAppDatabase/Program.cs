@@ -1,16 +1,12 @@
-﻿using NodaTime;
-using System.CommandLine;
-using System.CommandLine.Invocation;
+﻿using System.CommandLine;
 using System.CommandLine.Parsing;
-using System.ComponentModel.DataAnnotations;
+using StankinAppCore;
 
 namespace StankinAppDatabase
 {
     public class Program
     {
         const string DB_PATH = "schedule.db";
-        public static int year;
-        static ScheduleJsonReader _reader;
 
         static void Main(string[] args)
         {
@@ -70,9 +66,9 @@ namespace StankinAppDatabase
             Console.WriteLine("База данных не найдена. Создание новой базы данных...");
             var HandleParseError = HandleErrorMethods.HandleParseError2025;
             HandleErrorMethods.year = year;
-            DatabaseBuilder builder = new DatabaseBuilder(year, HandleParseError, DB_PATH);
+            DatabaseScraper builder = new(year, HandleParseError, DB_PATH);
 
-            _reader = new ScheduleJsonReader(year, null);
+            var _reader = new ScheduleJsonReader(year, (_) => []);
             //Create database schema
             Console.WriteLine("Создание схемы базы данных...");
             builder.CreateSchema();

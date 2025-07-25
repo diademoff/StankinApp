@@ -1,84 +1,108 @@
-﻿namespace StankinAppApi
+﻿using Microsoft.Extensions.Caching.Memory;
+using Serilog;
+using StankinAppCore;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// 1) Серилог: консоль + файл (ротация по дням, хранить 7 файлов)
+Log.Logger = new LoggerConfiguration()
+    .Enrich.FromLogContext()
+    .MinimumLevel.Debug()
+    .WriteTo.Console()
+    .WriteTo.File(
+        path: "Logs/schedule-api-.log",
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 7,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}"
+    )
+    .CreateLogger();
+
+builder.Host.UseSerilog();
+
+// 2) Kestrel
+builder.WebHost.ConfigureKestrel(opts =>
 {
-    class Program
+    opts.Limits.MaxRequestBodySize = 10 * 1024 * 1024;
+    opts.AddServerHeader = false;
+});
+
+// 3) CORS
+var origins = new[]
+{
+    "http://127.0.0.1:5500" // dev front-end
+};
+
+builder.Services.AddCors(o => o.AddPolicy("AllowFrontend", p =>
+    p.WithOrigins(origins)
+     .AllowAnyHeader()
+     .AllowAnyMethod()
+));
+
+// 4) DI: MemoryCache + IDataReader
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<IDataReader>(_ =>
+    new DatabaseReader(Path.GetFullPath("schedule.db"))
+);
+
+var app = builder.Build();
+app.UseCors("AllowFrontend");
+
+// 5) Endpoints
+
+app.MapGet("/api/groups", (IDataReader db, ILogger<Program> log) =>
+{
+    log.LogInformation("GET /api/groups");
+    return Results.Json(db.GetGroups());
+});
+
+app.MapGet("/api/rooms", (IDataReader db, ILogger<Program> log) =>
+{
+    log.LogInformation("GET /api/rooms");
+    return Results.Json(db.GetRooms());
+});
+
+app.MapGet("/api/teachers", (IDataReader db, ILogger<Program> log) =>
+{
+    log.LogInformation("GET /api/teachers");
+    return Results.Json(db.GetTeachers());
+});
+
+app.MapGet("/api/schedule", (string groupName, string startDate, string endDate,
+                             IDataReader db, IMemoryCache cache, ILogger<Program> log) =>
+{
+    if (string.IsNullOrWhiteSpace(groupName) ||
+        string.IsNullOrWhiteSpace(startDate) ||
+        string.IsNullOrWhiteSpace(endDate))
     {
-        private static readonly string PATH = Path.GetFullPath("schedule.db");
-        const string FRONTEND_ADDRESS = "http://127.0.0.1:5500";
+        log.LogWarning("Missing parameters: group={Group}, start={Start}, end={End}",
+            groupName, startDate, endDate);
+        return Results.BadRequest(new { error = "Missing required parameters" });
+    }
 
-        static void Main(string[] args)
+    var key = $"sched:{groupName}:{startDate}:{endDate}";
+    if (!cache.TryGetValue(key, out var schedule))
+    {
+        try
         {
-            var appBuilder = WebApplication.CreateBuilder(args);
-
-            appBuilder.WebHost.ConfigureKestrel(options =>
-            {
-                options.Limits.MaxRequestBodySize = 10 * 1024 * 1024; // 10 мб
-                options.AddServerHeader = false; // убрать заголовок Server
-            });
-            // 👇 добавляем политику CORS
-            appBuilder.Services.AddCors(options =>
-            {
-                options.AddPolicy("AllowFrontend", policy =>
-                {
-                    policy.WithOrigins(FRONTEND_ADDRESS) // адрес фронта
-                        .AllowAnyHeader()
-                        .AllowAnyMethod();
-                    // policy.AllowAnyOrigin();
-                });
-            });
-            var app = appBuilder.Build();
-            app.UseCors("AllowFrontend"); // применяем политику
-
-            var db = new StankinAppDatabase.DatabaseReader(PATH);
-
-            app.MapGet("/api/groups", async (context) =>
-            {
-                var groups = db.GetGroups();
-                await context.Response.WriteAsJsonAsync(groups);
-            });
-
-            app.MapGet("/api/rooms", async (context) =>
-            {
-                var groups = db.GetRooms();
-                await context.Response.WriteAsJsonAsync(groups);
-            });
-
-            app.MapGet("/api/teachers", async (context) =>
-            {
-                var groups = db.GetTeachers();
-                await context.Response.WriteAsJsonAsync(groups);
-            });
-
-            app.MapGet("/api/schedule", async (context) =>
-            {
-                var groupName = context.Request.Query["groupName"].ToString();
-                var startDate = context.Request.Query["startDate"].ToString();
-                var endDate = context.Request.Query["endDate"].ToString();
-
-                if (string.IsNullOrEmpty(groupName) || string.IsNullOrEmpty(startDate) || string.IsNullOrEmpty(endDate))
-                {
-                    context.Response.StatusCode = 400;
-                    await context.Response.WriteAsJsonAsync(new { error = "Missing required query parameters: groupName, startDate, endDate" });
-                    return;
-                }
-
-                try
-                {
-                    var schedule = db.GetScheduleForGroupInRange(groupName, startDate, endDate);
-                    await context.Response.WriteAsJsonAsync(schedule);
-                }
-                catch (Exception ex)
-                {
-                    context.Response.StatusCode = 500;
-                    await context.Response.WriteAsJsonAsync(new { error = $"Failed to retrieve schedule: {ex.Message}" });
-                }
-            });
-
-            app.Urls.Add("http://localhost:5001");
-            app.Urls.Add("https://localhost:5002");
-
-            app.RunAsync();
-
-            Console.ReadLine();
+            schedule = db.GetScheduleForGroupInRange(groupName, startDate, endDate);
+            cache.Set(key, schedule, TimeSpan.FromHours(2));
+            log.LogInformation("Fetched from DB & cached: {Key}", key);
+        }
+        catch (Exception ex)
+        {
+            log.LogError(ex, "Error fetching schedule for {Group}", groupName);
+            return Results.Json(new { error = "Internal server error" }, statusCode: 500);
         }
     }
-}
+    else
+    {
+        log.LogInformation("Served from cache: {Key}", key);
+    }
+
+    return Results.Json(schedule);
+});
+
+app.Urls.Add("http://localhost:5001");
+app.Urls.Add("https://localhost:5002");
+
+app.Run();
