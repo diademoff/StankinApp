@@ -77,6 +77,8 @@ public class DatabaseBuilder
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     lesson_id INTEGER NOT NULL,
                     date TEXT NOT NULL,
+                    sequence_position INTEGER NOT NULL,
+                    sequence_length INTEGER NOT NULL,
                     FOREIGN KEY (lesson_id) REFERENCES lessons(id)
                 );";
         command.ExecuteNonQuery();
@@ -133,16 +135,19 @@ public class DatabaseBuilder
 
             var lessonId = (long)(command.ExecuteScalar() ?? throw new NullReferenceException("lessonId is null"));
 
-            command.CommandText = @"
-                    INSERT INTO schedule_dates (lesson_id, date)
-                    VALUES (@lesson_id, @date)";
-            command.Parameters.Clear();
-            command.Parameters.AddWithValue("@lesson_id", lessonId);
-            var dateParam = command.Parameters.Add("@date", SqliteType.Text);
 
-            foreach (var date in course.Dates ?? throw new NullReferenceException($"{nameof(course.Dates)} is null"))
+            for (int i = 0; i < course.Dates?.Count; i++)
             {
+                var date = course.Dates[i];
+                command.CommandText = @"
+                        INSERT INTO schedule_dates (lesson_id, date, sequence_position, sequence_length)
+                        VALUES (@lesson_id, @date, @sequence_position, @sequence_length)";
+                command.Parameters.Clear();
+                command.Parameters.AddWithValue("@lesson_id", lessonId);
+                var dateParam = command.Parameters.Add("@date", SqliteType.Text);
                 dateParam.Value = new DateTime(currentYear, date.Month, date.Day).ToString("yyyy-MM-dd");
+                command.Parameters.AddWithValue("@sequence_position", i + 1);
+                command.Parameters.AddWithValue("@sequence_length", course.Dates?.Count);
                 command.ExecuteNonQuery();
             }
         }
