@@ -13,6 +13,8 @@ public struct Course
     public string? Type { get; set; }
     public string? Subgroup { get; set; }
     public string? Cabinet { get; set; }
+    public int SequencePosition { get; set; }
+    public int SequenceLength { get; set; }
 
     public override readonly string ToString()
     {

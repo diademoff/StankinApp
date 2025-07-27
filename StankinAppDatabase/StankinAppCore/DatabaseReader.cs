@@ -65,7 +65,9 @@ public class DatabaseReader(string dbPath) : IDataReader
                 Duration = duration,
                 Subgroup = reader.IsDBNull(6) ? null : reader.GetString(6),
                 GroupName = reader.GetString(7),
-                Dates = [parsedDate]
+                Dates = [parsedDate],
+                SequencePosition = reader.GetInt32(9),
+                SequenceLength = reader.GetInt32(10)
             });
         }
         return courses;
@@ -82,7 +84,7 @@ public class DatabaseReader(string dbPath) : IDataReader
         var sql = @"
             SELECT l.subject, t.name as teacher, l.lesson_type, r.name as room,
                    s.start_time, s.end_time, l.subgroup, g.name as group_name,
-                   sd.date
+                   sd.date, sd.sequence_position, sd.sequence_length
             FROM lessons l
             JOIN sessions s ON l.session_id = s.id
             JOIN groups g ON s.group_id = g.id
@@ -113,7 +115,7 @@ public class DatabaseReader(string dbPath) : IDataReader
         var sql = @"
             SELECT l.subject, t.name as teacher, l.lesson_type, r.name as room,
                    s.start_time, s.end_time, l.subgroup, g.name as group_name,
-                   sd.date
+                   sd.date, sd.sequence_position, sd.sequence_length
             FROM lessons l
             JOIN sessions s ON l.session_id = s.id
             JOIN groups g ON s.group_id = g.id
@@ -144,7 +146,7 @@ public class DatabaseReader(string dbPath) : IDataReader
         var sql = @"
             SELECT l.subject, t.name as teacher, l.lesson_type, r.name as room,
                    s.start_time, s.end_time, l.subgroup, g.name as group_name,
-                   sd.date
+                   sd.date, sd.sequence_position, sd.sequence_length
             FROM lessons l
             JOIN sessions s ON l.session_id = s.id
             JOIN groups g ON s.group_id = g.id
