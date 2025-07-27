@@ -84,7 +84,7 @@ app.MapGet("/api/schedule", (string groupName, string startDate, string endDate,
     {
         try
         {
-            schedule = db.GetScheduleForGroupInRange(groupName, startDate, endDate);
+            schedule = db.GetScheduleForGroup(groupName, startDate, endDate);
             cache.Set(key, schedule, TimeSpan.FromHours(2));
             log.LogInformation("Fetched from DB & cached: {Key}", key);
         }
