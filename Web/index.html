@@ -33,7 +33,7 @@
             <div>
                 <h1 class="text-xl font-semibold mb-2">группа: <span x-text="selectedGroup"></span></h1>
                 <button class="mb-4 text-sm text-blue-500 underline" @click="reset()">сменить группу</button>
-                <div x-data="scheduleComponent()" x-init="init()">
+                <div x-data="scheduleComponent(selectedGroup)" x-init="init()">
                     <div class="flex items-center justify-between mb-4">
                         <button @click="prevWeek()" class="px-2 py-1 bg-white rounded shadow disabled:opacity-50"
                             :disabled="loading">&lt;</button>
@@ -48,12 +48,14 @@
                         </div>
                         <button @click="nextWeek()" class="px-2 py-1 bg-white rounded shadow disabled:opacity-50"
                             :disabled="loading">&gt;</button>
+                        <!-- Debug -->
+                        <span x-text="loading"></span>
                     </div>
                     <div x-ref="scheduleContainer" class="overflow-y-auto max-h-[70vh] relative">
                         <div x-show="loading && loadingDir==='top'" class="text-gray-600 text-center py-2">загрузка
                             расписания...</div>
                         <div x-ref="loadMoreTop"></div>
-                        <template x-if="!loading && schedule.length === 0 && !error">
+                        <template x-if="!loading && isEmptySchedule && !error">
                             <p class="text-center">расписание не найдено.</p>
                         </template>
                         <template x-if="error">
@@ -86,188 +88,7 @@
         </template>
     </div>
     <script src="config.js"></script>
-    <script>
-        function scheduleApp() {
-            return {
-                groups: [], selectedGroup: null,
-                init() { this.selectedGroup = localStorage.getItem('group') || null; if (!this.selectedGroup) this.fetchGroups(); },
-                fetchGroups() { fetch(`${window.API_BASE_URL}/api/groups`).then(r => r.json()).then(data => this.groups = data).catch(() => this.groups = []); },
-                selectGroup(g) { this.selectedGroup = g; localStorage.setItem('group', g); },
-                reset() { localStorage.removeItem('group'); this.selectedGroup = null; this.fetchGroups(); }
-            }
-        }
-        function scheduleComponent() {
-            return {
-                schedule: [],
-                groupedSchedule: {},
-                loading: false,
-                error: null,
-                currentStartDate: null,
-                currentEndDate: null,
-                dateRange: [],
-                selectedDate: null,
-                weekStart: null,
-                observerTop: null,
-                observerBottom: null,
-                loadingDir: null,
-                prevScrollHeight: 0,
-                init() {
-                    const g = localStorage.getItem('group');
-                    if (!g) return;
-                    this.selectedDate = new Date().toISOString().split('T')[0];
-                    this.weekStart = this.getWeekStart(new Date(this.selectedDate));
-                    this.updateDateRange();
-                    const start = new Date(this.weekStart);
-                    start.setDate(start.getDate() - 14);
-                    const end = new Date(this.weekStart);
-                    end.setDate(end.getDate() + 20);
-                    this.currentStartDate = start;
-                    this.currentEndDate = end;
-                    this.fetchSchedule(start, end, 'initial');
-                    this.setupObservers();
-                },
-                getWeekStart(d) {
-                    const day = (d = new Date(d)).getDay();
-                    const diff = (day + 6) % 7;
-                    d.setDate(d.getDate() - diff);
-                    return d;
-                },
-                updateDateRange() {
-                    const arr = [];
-                    const d = new Date(this.weekStart);
-                    for (let i = 0; i < 7; i++) {
-                        arr.push(d.toISOString().split('T')[0]);
-                        d.setDate(d.getDate() + 1);
-                    }
-                    this.dateRange = arr;
-                },
-                prevWeek() {
-                    this.weekStart.setDate(this.weekStart.getDate() - 7);
-                    this.updateDateRange();
-                },
-                nextWeek() {
-                    this.weekStart.setDate(this.weekStart.getDate() + 7);
-                    this.updateDateRange();
-                },
-                onDateClick(date) {
-                    this.selectedDate = date;
-                    if (!this.groupedSchedule[date]) {
-                        const ws = this.getWeekStart(new Date(date));
-                        const s = new Date(ws);
-                        s.setDate(s.getDate());
-                        const e = new Date(ws);
-                        e.setDate(e.getDate() + 6);
-                        this.currentStartDate = s;
-                        this.currentEndDate = e;
-                        this.fetchSchedule(s, e, 'initial');
-                    }
-                    const el = document.getElementById('date-' + date);
-                    if (el) el.scrollIntoView({
-                        behavior: 'smooth'
-                    });
-                },
-                hasSchedule(date) {
-                    return !!this.groupedSchedule[date];
-                },
-                isSelectedDate(date) {
-                    return this.selectedDate === date;
-                },
-                setupObservers() {
-                    const opts = {
-                        root: this.$refs.scheduleContainer,
-                        rootMargin: '100px',
-                        threshold: 0
-                    };
-                    this.observerTop = new IntersectionObserver(ents => ents[0].isIntersecting && !this.loading && this.loadMore('top'), opts);
-                    this.observerBottom = new IntersectionObserver(ents => ents[0].isIntersecting && !this.loading && this.loadMore('bottom'), opts);
-                    this.observerTop.observe(this.$refs.loadMoreTop);
-                    this.observerBottom.observe(this.$refs.loadMoreBottom);
-                },
-                loadMore(dir) {
-                    this.loading = true;
-                    this.loadingDir = dir;
-                    let s = new Date(this.currentStartDate),
-                        e = new Date(this.currentEndDate);
-                    if (dir === 'top') {
-                        this.prevScrollHeight = this.$refs.scheduleContainer.scrollHeight;
-                        s.setDate(s.getDate() - 7);
-                        this.fetchSchedule(s, this.currentStartDate, 'top');
-                    } else {
-                        e.setDate(e.getDate() + 7);
-                        this.fetchSchedule(this.currentEndDate, e, 'bottom');
-                    }
-                },
-                fetchSchedule(s, e, dir) {
-                    const params = `groupName=${encodeURIComponent(localStorage.getItem('group'))}&startDate=${this.formatDateForApi(s)}&endDate=${this.formatDateForApi(e)}`;
-                    fetch(`${window.API_BASE_URL}/api/schedule?` + params).then(r => {
-                        if (!r.ok) throw Error('ошибка загрузки');
-                        return r.json()
-                    }).then(data => {
-                        if (dir === 'top') {
-                            this.schedule = [...data, ...this.schedule];
-                            this.currentStartDate = s;
-                            Alpine.nextTick(() => {
-                                this.$refs.scheduleContainer.scrollTop = this.$refs.scheduleContainer.scrollHeight - this.prevScrollHeight;
-                            });
-                        } else if (dir === 'bottom') {
-                            this.schedule = [...this.schedule, ...data];
-                            this.currentEndDate = e;
-                        } else {
-                            this.schedule = data;
-                        }
-                        this.groupScheduleByDate();
-                        this.loading = false;
-                        this.error = null;
-                    }).catch(err => {
-                        this.error = err.message;
-                        this.loading = false;
-                    });
-                },
-                groupScheduleByDate() {
-                    this.groupedSchedule = this.schedule.reduce((a, l) => {
-                        const d = l.dates[0];
-                        const key = `${d.year}-${String(d.month).padStart(2, '0')}-${String(d.day).padStart(2, '0')}`;
-                        (a[key] || (a[key] = [])).push(l);
-                        return a;
-                    }, {});
-                },
-                formatDate(d) {
-                    const x = new Date(d);
-                    return x.toLocaleDateString('ru-RU', {
-                        weekday: 'long',
-                        day: 'numeric',
-                        month: 'long'
-                    });
-                },
-                formatDateShort(d) {
-                    const x = new Date(d);
-                    const m = ['янв.', 'фев.', 'мар.', 'апр.', 'май', 'июн.', 'июл.', 'авг.', 'сен.', 'окт.', 'ноя.', 'дек.'];
-                    return `${x.getDate()} ${m[x.getMonth()]}`;
-                },
-                formatTime(t) {
-                    return String(t.hour).padStart(2, '0') + ':' + String(t.minute).padStart(2, '0');
-                },
-                calculateEndTime(s, d) {
-                    const st = new Date(0, 0, 0, s.hour, s.minute);
-                    const en = new Date(st.getTime() + d.hours * 3600000 + d.minutes * 60000);
-                    return {
-                        hour: en.getHours(),
-                        minute: en.getMinutes()
-                    };
-                },
-                formatDateForApi(d) {
-                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-                },
-                getLessonClass(t) {
-                    return {
-                        'лекции': 'bg-blue-100',
-                        'семинар': 'bg-green-100',
-                        'лабораторная работа': 'bg-yellow-100'
-                    }[t] || 'bg-gray-100';
-                }
-            }
-        }
-    </script>
+    <script src="script.js"></script>
 </body>
 
 </html>
