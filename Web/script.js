@@ -434,271 +434,234 @@
 
         console.log("Вызов создания объекта scheduleComponent для " + groupNameInitial);
 
-
-        // state объекта, который вернём в Alpine
-        const state = {
-            // входной параметр
+        // Возвращаемый объект содержит все свойства напрямую
+        const apiSurface = {
             groupName: groupNameInitial,
-
-            // интерфейс состояния
             loading: false,
-            loadingDir: null, // 'top'|'bottom'|'initial'
+            loadingDir: null,
             error: null,
-
-            // weekStart — Date, начало текущей карусели (понедельник)
             weekStart: DateUtils.startOfWeek(new Date()),
-
-            // dateRange: массив строк YYYY-MM-DD для показа в карусели
             dateRange: [],
-            isEmptySchedule: true, // начальное состояние
-
-            // groupedSchedule будет заполнен методом updateGroupedSchedule()
+            isEmptySchedule: true,
             groupedSchedule: {},
-
-            // флаги загрузок
             loadingTop: false,
             loadingBottom: false,
             initialLoadDone: false,
-
-            // рефы и наблюдатели (инициализируются в init)
             observerTop: null,
             observerBottom: null,
-            // методы будут добавлены ниже
-        };
 
-        // Вспомогательные функции внутри компонента
-        function updateDateRange() {
-            const arr = [];
-            const d = DateUtils.startOfWeek(state.weekStart);
-            for (let i = 0; i < 7; i++) {
-                arr.push(DateUtils.toIsoDate(DateUtils.addDays(d, i)));
-            }
-            state.dateRange = arr;
-            applyState();
-        }
-
-        function updateGroupedSchedule() {
-            state.groupedSchedule = mem.asGroupedObject();
-
-            // Проверка на пустое расписание
-            state.isEmptySchedule = Object.keys(state.groupedSchedule).every(
-                date => state.groupedSchedule[date].length === 0
-            );
-
-            applyState();
-        }
-
-        function ensureWeekIsLoadedInMemory(weekStartDate) {
-            if (!weekStartDate) return false;
-            // Проверяем: если уже есть все дни этой недели — считаем что загружено.
-            const days = DateUtils.rangeDays(weekStartDate, 7);
-            for (const d of days) {
-                const ds = DateUtils.toIsoDate(d);
-                if (!mem.hasDay(ds)) {
-                    return false;
+            // Вспомогательные функции внутри компонента
+            updateDateRange() {
+                const arr = [];
+                const d = DateUtils.startOfWeek(this.weekStart);
+                for (let i = 0; i < 7; i++) {
+                    arr.push(DateUtils.toIsoDate(DateUtils.addDays(d, i)));
                 }
-            }
-            return true;
-        }
+                this.dateRange = arr;
+            },
 
-        // Загрузка недели: weekStartDate — Date (понедельник)
-        async function loadWeek(weekStartDate, direction = 'bottom') {
-            if (!state.groupName || !weekStartDate) {
-                state.error = 'Не указана группа или дата';
-                return;
-            }
-            const startApi = DateUtils.formatDateForApi(weekStartDate);
-            const endApi = DateUtils.formatDateForApi(DateUtils.addDays(weekStartDate, 6));
-            const cacheKey = repo.cacheKeyForWeek(state.groupName, startApi, endApi);
+            updateGroupedSchedule() {
+                this.groupedSchedule = mem.asGroupedObject();
 
-            // Если уже загружена в память и кэш не просрочен — можно избежать fetch.
-            const cached = cache.get(cacheKey);
-            if (cached && ensureWeekIsLoadedInMemory(weekStartDate)) {
-                return { fromCache: true, items: cached };
-            }
+                // Проверка на пустое расписание
+                this.isEmptySchedule = Object.keys(this.groupedSchedule).every(
+                    date => this.groupedSchedule[date].length === 0
+                );
+            },
 
-            try {
-                if (direction === 'top') {
-                    state.loadingTop = true;
-                } else if (direction === 'bottom') {
-                    state.loadingBottom = true;
-                } else {
-                    state.loading = true;
-                    applyState();
-                }
-                state.loadingDir = direction;
-                state.error = null;
-
-                const { items, fromCache } = await repo.fetchWeek(state.groupName, startApi, endApi);
-                // Заполняем память: для каждой даты недели гарантируем запись (даже если пустая)
-                // Сначала трансформируем элементы в уроки по датам
-                const lessons = repo.normalizeItemsToLessons(items);
-                // Для каждой дня недели — соберём соответствующие уроки
+            ensureWeekIsLoadedInMemory(weekStartDate) {
+                if (!weekStartDate) return false;
+                // Проверяем: если уже есть все дни этой недели — считаем что загружено.
                 const days = DateUtils.rangeDays(weekStartDate, 7);
                 for (const d of days) {
                     const ds = DateUtils.toIsoDate(d);
-                    const lessonsForDay = lessons.filter(l => l.date === ds).map(l => {
-                        // убираем временное поле date — оставляем только полезные поля (но оставим date для удобства)
-                        return Object.assign({}, l);
-                    });
-                    // merge чтобы не потерять существующие (возможны частичные перекрытия)
-                    mem.mergeDay(ds, lessonsForDay);
-                }
-                // Если API вернул уроки с датами за пределами недели (маловероятно) — тоже добавляем их
-                for (const l of lessons) {
-                    if (!mem.hasDay(l.date)) mem.setDay(l.date, [l]);
-                }
-
-                // Обеспечим пустые дни в диапазоне
-                const weekEnd = DateUtils.addDays(weekStartDate, 6);
-                mem.ensureDaysRange(weekStartDate, weekEnd);
-
-                updateGroupedSchedule();
-                return { items, fromCache };
-            } catch (e) {
-                console.error('loadWeek error', e);
-                state.error = 'Ошибка загрузки расписания.';
-                throw e;
-            } finally {
-                state.loading = false;
-                state.loadingTop = false;
-                state.loadingBottom = false;
-                state.loadingDir = null;
-                state.initialLoadDone = true;
-                applyState();
-            }
-        }
-
-        // Вспомог: загрузить соседнюю неделю вверх/вниз относительно уже загруженного диапазона
-        async function loadMore(direction) {
-            // direction: 'top' or 'bottom'
-            if (direction === 'top') {
-                if (state.loadingTop) return;
-                // определим самую раннюю дату в памяти
-                const earliest = mem.earliestDate();
-                let anchorDate = earliest ? new Date(earliest + 'T00:00:00') : DateUtils.startOfWeek(new Date());
-                // хотим загрузить неделю перед текущей earliest
-                const newWeekStart = DateUtils.startOfWeek(DateUtils.addDays(anchorDate, -7));
-                // сохраним позицию скролла для компенсации
-                const container = state.$refs?.scheduleContainer;
-                let prevScrollHeight = 0, prevScrollTop = 0;
-                if (container) {
-                    prevScrollHeight = container.scrollHeight;
-                    prevScrollTop = container.scrollTop;
-                }
-                await loadWeek(newWeekStart, 'top');
-                // компенсируем скролл так, чтобы пользователь не "провалился" вниз
-                if (container) {
-                    const delta = container.scrollHeight - prevScrollHeight;
-                    container.scrollTop = prevScrollTop + delta;
-                }
-            } else if (direction === 'bottom') {
-                if (state.loadingBottom) return;
-                const latest = mem.latestDate();
-                let anchorDate = latest ? new Date(latest + 'T00:00:00') : DateUtils.startOfWeek(new Date());
-                const newWeekStart = DateUtils.startOfWeek(DateUtils.addDays(anchorDate, 7));
-                await loadWeek(newWeekStart, 'bottom');
-                // no special scroll compensation necessary for bottom append
-            }
-        }
-
-        // Клик по дате в карусели: подгрузить неделю с этой датой (если ещё не загружена / устарела), затем скроллить к ней
-        async function onDateClick(dateStr) {
-            try {
-                // dateStr = 'YYYY-MM-DD'
-                const clicked = new Date(dateStr + 'T00:00:00');
-                const weekStart = DateUtils.startOfWeek(clicked);
-                // Загружаем неделю (если не загружена)
-                if (!ensureWeekIsLoadedInMemory(weekStart)) {
-                    await loadWeek(weekStart, 'initial');
-                }
-                // Обновлённый groupedSchedule готов — плавно скроллим
-                await scrollToDate(dateStr);
-            } catch (e) {
-                console.error('onDateClick error', e);
-            }
-        }
-
-        // Скролл к указанной дате
-        async function scrollToDate(dateStr) {
-            // Ждём ререндер (микрозадача)
-            await new Promise(r => requestAnimationFrame(r));
-            const container = state.$refs?.scheduleContainer;
-            if (!container) return;
-            const el = container.querySelector(`#date-${dateStr}`);
-            if (!el) {
-                // возможно дата ещё не добавлена — ничего не делаем
-                return;
-            }
-            // плавный скролл внутри контейнера
-            // Используем scrollIntoView с опцией — внутри контейнера должна прокручиваться только контейнер.
-            try {
-                el.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
-            } catch (e) {
-                // fallback
-                const top = el.offsetTop - container.offsetTop;
-                container.scrollTo({ top, behavior: 'smooth' });
-            }
-        }
-
-        // Инициализация intersection observers для бесконечной прокрутки
-        function setupObservers() {
-            const container = state.$refs.scheduleContainer;
-            if (!container || !state.$refs.loadMoreTop || !state.$refs.loadMoreBottom) return;
-
-            // Верхняя загрузка: root = container, наблюдаем за .loadMoreTop
-            state.observerTop = new IntersectionObserver(async (entries) => {
-                for (const e of entries) {
-                    if (e.isIntersecting) {
-                        // Не запускаем top-загрузку пока не сделали initialLoad
-                        if (!state.initialLoadDone) continue;
-                        if (!state.loadingTop) {
-                            await loadMore('top');
-                        }
+                    if (!mem.hasDay(ds)) {
+                        return false;
                     }
                 }
-            }, { root: container, rootMargin: '150px 0px', threshold: 0.01 });
+                return true;
+            },
 
-            state.observerBottom = new IntersectionObserver(async (entries) => {
-                for (const e of entries) {
-                    if (e.isIntersecting) {
-                        if (!state.initialLoadDone) continue;
-                        if (!state.loadingBottom) {
-                            await loadMore('bottom');
+            // Загрузка недели: weekStartDate — Date (понедельник)
+            async loadWeek(weekStartDate, direction = 'bottom') {
+                if (!this.groupName || !weekStartDate) {
+                    this.error = 'Не указана группа или дата';
+                    return;
+                }
+                const startApi = DateUtils.formatDateForApi(weekStartDate);
+                const endApi = DateUtils.formatDateForApi(DateUtils.addDays(weekStartDate, 6));
+                const cacheKey = repo.cacheKeyForWeek(this.groupName, startApi, endApi);
+
+                // Если уже загружена в память и кэш не просрочен — можно избежать fetch.
+                const cached = cache.get(cacheKey);
+                if (cached && this.ensureWeekIsLoadedInMemory(weekStartDate)) {
+                    return { fromCache: true, items: cached };
+                }
+
+                try {
+                    if (direction === 'top') {
+                        this.loadingTop = true;
+                    } else if (direction === 'bottom') {
+                        this.loadingBottom = true;
+                    } else {
+                        this.loading = true;
+                    }
+                    this.loadingDir = direction;
+                    this.error = null;
+
+                    const { items, fromCache } = await repo.fetchWeek(this.groupName, startApi, endApi);
+                    // Заполняем память: для каждой даты недели гарантируем запись (даже если пустая)
+                    // Сначала трансформируем элементы в уроки по датам
+                    const lessons = repo.normalizeItemsToLessons(items);
+                    // Для каждой дня недели — соберём соответствующие уроки
+                    const days = DateUtils.rangeDays(weekStartDate, 7);
+                    for (const d of days) {
+                        const ds = DateUtils.toIsoDate(d);
+                        const lessonsForDay = lessons.filter(l => l.date === ds).map(l => {
+                            // убираем временное поле date — оставляем только полезные поля (но оставим date для удобства)
+                            return Object.assign({}, l);
+                        });
+                        // merge чтобы не потерять существующие (возможны частичные перекрытия)
+                        mem.mergeDay(ds, lessonsForDay);
+                    }
+                    // Если API вернул уроки с датами за пределами недели (маловероятно) — тоже добавляем их
+                    for (const l of lessons) {
+                        if (!mem.hasDay(l.date)) mem.setDay(l.date, [l]);
+                    }
+
+                    // Обеспечим пустые дни в диапазоне
+                    const weekEnd = DateUtils.addDays(weekStartDate, 6);
+                    mem.ensureDaysRange(weekStartDate, weekEnd);
+
+                    this.updateGroupedSchedule();
+                    return { items, fromCache };
+                } catch (e) {
+                    console.error('loadWeek error', e);
+                    this.error = 'Ошибка загрузки расписания.';
+                    throw e;
+                } finally {
+                    this.loading = false;
+                    this.loadingTop = false;
+                    this.loadingBottom = false;
+                    this.loadingDir = null;
+                    this.initialLoadDone = true;
+                }
+            },
+
+            // Вспомог: загрузить соседнюю неделю вверх/вниз относительно уже загруженного диапазона
+            async loadMore(direction) {
+                // direction: 'top' or 'bottom'
+                if (direction === 'top') {
+                    if (this.loadingTop) return;
+                    // определим самую раннюю дату в памяти
+                    const earliest = mem.earliestDate();
+                    let anchorDate = earliest ? new Date(earliest + 'T00:00:00') : DateUtils.startOfWeek(new Date());
+                    // хотим загрузить неделю перед текущей earliest
+                    const newWeekStart = DateUtils.startOfWeek(DateUtils.addDays(anchorDate, -7));
+                    // сохраним позицию скролла для компенсации
+                    const container = this.$refs?.scheduleContainer;
+                    let prevScrollHeight = 0, prevScrollTop = 0;
+                    if (container) {
+                        prevScrollHeight = container.scrollHeight;
+                        prevScrollTop = container.scrollTop;
+                    }
+                    await this.loadWeek(newWeekStart, 'top');
+                    // компенсируем скролл так, чтобы пользователь не "провалился" вниз
+                    if (container) {
+                        const delta = container.scrollHeight - prevScrollHeight;
+                        container.scrollTop = prevScrollTop + delta;
+                    }
+                } else if (direction === 'bottom') {
+                    if (this.loadingBottom) return;
+                    const latest = mem.latestDate();
+                    let anchorDate = latest ? new Date(latest + 'T00:00:00') : DateUtils.startOfWeek(new Date());
+                    const newWeekStart = DateUtils.startOfWeek(DateUtils.addDays(anchorDate, 7));
+                    await this.loadWeek(newWeekStart, 'bottom');
+                    // no special scroll compensation necessary for bottom append
+                }
+            },
+
+            // Клик по дате в карусели: подгрузить неделю с этой датой (если ещё не загружена / устарела), затем скроллить к ней
+            async onDateClick(dateStr) {
+                try {
+                    // dateStr = 'YYYY-MM-DD'
+                    const clicked = new Date(dateStr + 'T00:00:00');
+                    const weekStart = DateUtils.startOfWeek(clicked);
+                    // Загружаем неделю (если не загружена)
+                    if (!this.ensureWeekIsLoadedInMemory(weekStart)) {
+                        await this.loadWeek(weekStart, 'initial');
+                    }
+                    // Обновлённый groupedSchedule готов — плавно скроллим
+                    await this.scrollToDate(dateStr);
+                } catch (e) {
+                    console.error('onDateClick error', e);
+                }
+            },
+
+            // Скролл к указанной дате
+            async scrollToDate(dateStr) {
+                // Ждём ререндер (микрозадача)
+                await new Promise(r => requestAnimationFrame(r));
+                const container = this.$refs?.scheduleContainer;
+                if (!container) return;
+                const el = container.querySelector(`#date-${dateStr}`);
+                if (!el) {
+                    // возможно дата ещё не добавлена — ничего не делаем
+                    return;
+                }
+                // плавный скролл внутри контейнера
+                // Используем scrollIntoView с опцией — внутри контейнера должна прокручиваться только контейнер.
+                try {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+                } catch (e) {
+                    // fallback
+                    const top = el.offsetTop - container.offsetTop;
+                    container.scrollTo({ top, behavior: 'smooth' });
+                }
+            },
+
+            // Инициализация intersection observers для бесконечной прокрутки
+            setupObservers() {
+                const container = this.$refs.scheduleContainer;
+                if (!container || !this.$refs.loadMoreTop || !this.$refs.loadMoreBottom) return;
+
+                // Верхняя загрузка: root = container, наблюдаем за .loadMoreTop
+                this.observerTop = new IntersectionObserver(async (entries) => {
+                    for (const e of entries) {
+                        if (e.isIntersecting) {
+                            // Не запускаем top-загрузку пока не сделали initialLoad
+                            if (!this.initialLoadDone) continue;
+                            if (!this.loadingTop) {
+                                await this.loadMore('top');
+                            }
                         }
                     }
-                }
-            }, { root: container, rootMargin: '150px 0px', threshold: 0.01 });
+                }, { root: container, rootMargin: '150px 0px', threshold: 0.01 });
 
-            state.observerTop.observe(state.$refs.loadMoreTop);
-            state.observerBottom.observe(state.$refs.loadMoreBottom);
-        }
+                this.observerBottom = new IntersectionObserver(async (entries) => {
+                    for (const e of entries) {
+                        if (e.isIntersecting) {
+                            if (!this.initialLoadDone) continue;
+                            if (!this.loadingBottom) {
+                                await this.loadMore('bottom');
+                            }
+                        }
+                    }
+                }, { root: container, rootMargin: '150px 0px', threshold: 0.01 });
 
-        // Очистка наблюдателей
-        function disconnectObservers() {
-            try {
-                state.observerTop?.disconnect();
-                state.observerBottom?.disconnect();
-            } catch (e) { }
-            state.observerTop = null;
-            state.observerBottom = null;
-        }
+                this.observerTop.observe(this.$refs.loadMoreTop);
+                this.observerBottom.observe(this.$refs.loadMoreBottom);
+            },
 
-        // Public API (возвращаемый объект — Alpine x-data)
-        const apiSurface = {
-            // состояние (ссылки сюда будут связаны)
-            get group() { return state.groupName; },
-
-            // Alpine ожидает свойства, поэтому копируем нужные
-            weekStart: state.weekStart,
-            dateRange: state.dateRange,
-            groupedSchedule: state.groupedSchedule,
-            isEmptySchedule: state.isEmptySchedule,
-            loading: state.loading,
-            loadingDir: state.loadingDir,
-            loadingTop: state.loadingTop,
-            loadingBottom: state.loadingBottom,
-            error: state.error,
+            // Очистка наблюдателей
+            disconnectObservers() {
+                try {
+                    this.observerTop?.disconnect();
+                    this.observerBottom?.disconnect();
+                } catch (e) { }
+                this.observerTop = null;
+                this.observerBottom = null;
+            },
 
             // утилиты для шаблона
             getLessonClass(t) {
@@ -743,12 +706,12 @@
             },
 
             prevWeek() {
-                state.weekStart = DateUtils.addDays(state.weekStart, -7);
-                updateDateRange();
+                this.weekStart = DateUtils.addDays(this.weekStart, -7);
+                this.updateDateRange();
             },
             nextWeek() {
-                state.weekStart = DateUtils.addDays(state.weekStart, 7);
-                updateDateRange();
+                this.weekStart = DateUtils.addDays(this.weekStart, 7);
+                this.updateDateRange();
             },
 
             // onDateClick должен:
@@ -756,80 +719,70 @@
             //  - добавить в список (mem)
             //  - проскроллить к дате
             async onDateClick(dateStr) {
-                await onDateClick(dateStr);
-                // обновляем groupedSchedule чтобы Alpine подхватил изменения
-                updateGroupedSchedule();
+                try {
+                    // dateStr = 'YYYY-MM-DD'
+                    const clicked = new Date(dateStr + 'T00:00:00');
+                    const weekStart = DateUtils.startOfWeek(clicked);
+                    // Загружаем неделю (если не загружена)
+                    if (!this.ensureWeekIsLoadedInMemory(weekStart)) {
+                        await this.loadWeek(weekStart, 'initial');
+                    }
+                    // Обновлённый groupedSchedule готов — плавно скроллим
+                    await this.scrollToDate(dateStr);
+                    // обновляем groupedSchedule чтобы Alpine подхватил изменения
+                    this.updateGroupedSchedule();
+                } catch (e) {
+                    console.error('onDateClick error', e);
+                }
             },
 
             // Инициализация компонента (вызовется Alpine x-init="init()")
             async init() {
-                // Привяжем $refs и методы к state — Alpine проксирует $el / $refs на this
-                state.$refs = this.$refs ? this.$refs : {};
-                state.$el = this.$el ? this.$el : null;
-
-                state.groupedSchedule = {};
-                state.isEmptySchedule = true;
+                this.groupedSchedule = {};
+                this.isEmptySchedule = true;
 
                 // Синхронизируем weekStart, dateRange
-                state.weekStart = DateUtils.startOfWeek(new Date());
-                updateDateRange();
-                applyState();
+                this.weekStart = DateUtils.startOfWeek(new Date());
+                this.updateDateRange();
 
                 // initial load: загрузим текущую неделю
                 try {
                     // clear memory
                     // mem = new ScheduleMemory() — но это const; аккуратно: просто оставим mem пустым
                     // Загрузим week start
-                    await loadWeek(state.weekStart, 'initial');
+                    await this.loadWeek(this.weekStart, 'initial');
                     // После первой загрузки настроим observers
                     // Однако refs могут быть ещё не привязаны — поэтому делаем небольшой таймаут на рендер
                     await new Promise(r => requestAnimationFrame(r));
-                    // обновим refs (в случае Alpine)
-                    state.$refs = this.$refs ? this.$refs : state.$refs;
-                    state.$el = this.$el ? this.$el : state.$el;
-                    setupObservers();
+                    this.setupObservers();
                 } catch (e) {
                     console.error('initial load failed', e);
                 } finally {
-                    updateGroupedSchedule();
+                    this.updateGroupedSchedule();
                 }
             },
 
             // Служебные: reset, dispose
             async loadMoreTop() {
-                await loadMore('top');
-                updateGroupedSchedule();
+                await this.loadMore('top');
+                this.updateGroupedSchedule();
             },
             async loadMoreBottom() {
-                await loadMore('bottom');
-                updateGroupedSchedule();
+                await this.loadMore('bottom');
+                this.updateGroupedSchedule();
             },
 
             // Сбрасываем наблюдателей при уничтожении
             destroy() {
-                disconnectObservers();
+                this.disconnectObservers();
             }
         };
-
-        function applyState() {
-            apiSurface.dateRange = state.dateRange;
-            apiSurface.groupedSchedule = state.groupedSchedule;
-            apiSurface.loading = state.loading;
-            apiSurface.loadingDir = state.loadingDir;
-            apiSurface.loadingTop = state.loadingTop;
-            apiSurface.loadingBottom = state.loadingBottom;
-            apiSurface.error = state.error;
-            console.log("Вызван applyState.");
-            console.log(apiSurface);
-        }
 
         console.log("Возвращён объект расписания scheduleComponent");
         console.log(apiSurface);
 
-
         return apiSurface;
     }
-
     // expose to global (для Alpine x-data)
     window.scheduleApp = scheduleApp;
     window.scheduleComponent = scheduleComponent;

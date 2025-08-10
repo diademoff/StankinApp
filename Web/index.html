@@ -48,8 +48,6 @@
                         </div>
                         <button @click="nextWeek()" class="px-2 py-1 bg-white rounded shadow disabled:opacity-50"
                             :disabled="loading">&gt;</button>
-                        <!-- Debug -->
-                        <span x-text="loading"></span>
                     </div>
                     <div x-ref="scheduleContainer" class="overflow-y-auto max-h-[70vh] relative">
                         <div x-show="loading && loadingDir==='top'" class="text-gray-600 text-center py-2">загрузка
@@ -61,11 +59,11 @@
                         <template x-if="error">
                             <p class="text-red-500 text-center" x-text="error"></p>
                         </template>
-                        <template x-for="(day, date) in groupedSchedule" :key="date">
-                            <div :id="'date-' + date" class="mb-6">
-                                <h2 class="text-lg font-semibold mb-2" x-text="formatDate(date)"></h2>
+                        <template x-for="entry in Object.entries(groupedSchedule)" :key="entry[0]">
+                            <div :id="'date-' + entry[0]" class="mb-6">
+                                <h2 class="text-lg font-semibold mb-2" x-text="formatDate(entry[0])"></h2>
                                 <div class="space-y-4">
-                                    <template x-for="lesson in day" :key="lesson.subject + lesson.startTime.hour">
+                                    <template x-for="lesson in entry[1]" :key="lesson.subject + lesson.startTime.hour">
                                         <div :class="getLessonClass(lesson.type) + ' p-4 rounded shadow'">
                                             <p class="font-medium" x-text="lesson.subject"></p>
                                             <p
