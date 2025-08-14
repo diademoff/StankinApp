@@ -2,3 +2,14 @@
 2. [c# database](./StankinAppDatabase/StankinAppDatabase/) позволяет создавать базу данных из json. Создаётся sql база для всего заведения.
 3. [c# web api](./StankinAppDatabase/StankinAppApi/). предоставляет доступ к БД.
 4. [alpine js + tailwind](./Web/) pwa frontend
+
+For live server
+```
+"liveServer.settings.ignoreFiles": [
+  ".vscode/**",
+  "**/*.scss",
+  "**/*.sass",
+  "**/*.ts",
+  "StankinAppDatabase/**"
+]
+```
