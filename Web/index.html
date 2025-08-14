@@ -49,6 +49,7 @@
                         <button @click="nextWeek()" class="px-2 py-1 bg-white rounded shadow disabled:opacity-50"
                             :disabled="loading">&gt;</button>
                     </div>
+                    <!-- TODO: edit max-h-[70vh] -->
                     <div x-ref="scheduleContainer" class="overflow-y-auto max-h-[70vh] relative">
                         <div x-show="loading && loadingDir==='top'" class="text-gray-600 text-center py-2">загрузка
                             расписания...</div>
@@ -62,21 +63,54 @@
                         <template x-for="entry in Object.entries(groupedSchedule)" :key="entry[0]">
                             <div :id="'date-' + entry[0]" class="mb-6">
                                 <h2 class="text-lg font-semibold mb-2" x-text="formatDate(entry[0])"></h2>
+
                                 <div class="space-y-4">
-                                    <template x-for="lesson in entry[1]" :key="lesson.subject + lesson.startTime.hour">
-                                        <div :class="getLessonClass(lesson.type) + ' p-4 rounded shadow'">
-                                            <p class="font-medium" x-text="lesson.subject"></p>
-                                            <p
-                                                x-text="formatTime(lesson.startTime) + ' - ' + formatTime(calculateEndTime(lesson.startTime, lesson.duration))">
-                                            </p>
-                                            <p x-text="lesson.teacher || 'не указан'"></p>
-                                            <p x-text="lesson.cabinet"></p>
-                                            <p x-text="lesson.type"></p>
+                                    <template x-for="lesson in entry[1]" :key="lessonKey(entry[0], lesson)">
+                                        <!-- Карточка -->
+                                        <div class="group relative rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 p-4 hover:shadow-md focus-within:ring-2 focus-within:ring-blue-400 transition"
+                                            :aria-label="`Занятие: ${lesson.subject}`">
+                                            <!-- 1. Предмет + время -->
+                                            <div class="flex items-start justify-between gap-3">
+                                                <h3 class="text-lg sm:text-xl font-semibold tracking-tight leading-snug"
+                                                    x-text="lesson.subject"></h3>
+                                                <div class="shrink-0 text-right">
+                                                    <div class="text-sm font-mono tabular-nums"
+                                                        x-text="formatTime(lesson.startTime) + '–' + formatTime(calculateEndTime(lesson.startTime, lesson.duration))">
+                                                    </div>
+                                                </div>
+                                            </div>
+
+
+                                            <!-- Тип + кабинет + порядковый номер -->
+                                            <div class="mt-2 flex flex-wrap items-center gap-2 text-sm">
+                                                <span
+                                                class="inline-block rounded-md bg-gray-50 ring-1 ring-gray-200 px-2 py-1 text-sm font-medium"
+                                                x-text="formatCabinet(lesson.cabinet)"></span>
+                                                <span
+                                                class="inline-flex items-center rounded-full px-2 py-1 ring-1 font-medium"
+                                                :class="typeBadgeClass(lesson.type)" x-text="lesson.type"></span>
+                                                <span class="text-gray-600"
+                                                x-text="formatSequence(lesson.sequencePosition, lesson.sequenceLength, lesson.type)"></span>
+                                            </div>
+
+                                            <!-- Подгруппа -->
+                                            <div class="mt-2">
+                                                <template x-if="lesson.subgroup">
+                                                    <span class="text-gray-500">· подгруппа: <span
+                                                            x-text="lesson.subgroup"></span></span>
+                                                </template>
+                                            </div>
+
+                                            <!-- 4. Преподаватель -->
+                                            <div class="mt-2 text-sm text-gray-800">
+                                                <span x-text="lesson.teacher || 'преподаватель не указан'"></span>
+                                            </div>
                                         </div>
                                     </template>
                                 </div>
                             </div>
                         </template>
+
                         <div x-ref="loadMoreBottom"></div>
                         <div x-show="loading && loadingDir==='bottom'" class="text-gray-600 text-center py-2">загрузка
                             расписания...</div>

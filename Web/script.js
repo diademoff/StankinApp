@@ -676,13 +676,6 @@
             },
 
             // утилиты для шаблона
-            getLessonClass(t) {
-                return {
-                    'лекции': 'bg-blue-100',
-                    'семинар': 'bg-green-100',
-                    'лабораторная работа': 'bg-yellow-100'
-                }[t] || 'bg-gray-100';
-            },
             formatDate(d) {
                 return DateUtils.formatDateHuman(d);
             },
@@ -782,6 +775,30 @@
             async loadMoreBottom() {
                 await this.loadMore('bottom');
                 this.updateGroupedSchedule();
+            },
+
+            lessonKey(date, l) {
+                return `${date}-${l.subject}-${l.startTime?.hour ?? '00'}-${l.startTime?.minute ?? '00'}-${l.subgroup ?? ''}`;
+            },
+
+            typeBadgeClass(typeRaw) {
+                const t = (typeRaw || '').toLowerCase();
+                if (t.includes('лекц')) return 'bg-blue-50 text-blue-700 ring-blue-200';
+                //if (t.includes('практ')) return 'bg-green-50 text-green-700 ring-green-200';
+                if (t.includes('лаб')) return 'bg-amber-50 text-amber-700 ring-amber-200';
+                if (t.includes('сем')) return 'bg-purple-50 text-purple-700 ring-purple-200';
+                //if (t.includes('экзам')) return 'bg-red-50 text-red-700 ring-red-200';
+                //if (t.includes('зач')) return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
+                return 'bg-gray-50 text-gray-700 ring-gray-200';
+            },
+
+            formatCabinet(cab) {
+                const v = (cab || '').trim();
+                return v.length ? v : 'кабинет не указан';
+            },
+
+            formatSequence(pos, len, typeRaw) {
+                return `${pos} из ${len}`;
             },
 
             // Сбрасываем наблюдателей при уничтожении
