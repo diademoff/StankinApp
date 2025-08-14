@@ -159,12 +159,12 @@
         }
 
         async fetchJson(url, opts = {}) {
-            const res = await fetch(url, opts);
+            let res = await fetch(url, opts);
             if (!res.ok) {
                 const text = await res.text().catch(() => '');
                 throw new Error(`API error ${res.status}: ${text}`);
             }
-            console.log("Запрос" + url + " выполнен");
+            console.log("Запрос " + url + " выполнен");
 
             return res.json();
         }
@@ -204,9 +204,13 @@
 
         // Сначала кэш, иначе API. Возвращает объект: { items: Array, fromCache: bool }
         async fetchWeek(groupName, startDateApi, endDateApi) {
+            console.log("fetching week " + groupName +
+                ", date=" + startDateApi + ", " + endDateApi);
+
             const key = this.cacheKeyForWeek(groupName, startDateApi, endDateApi);
             const cached = this.cache.get(key);
             if (cached) {
+                console.log("found in cache for date=" + startDateApi + ", " + endDateApi);
                 return { items: cached, fromCache: true };
             }
             const items = await this.api.getSchedule(groupName, startDateApi, endDateApi);
@@ -488,6 +492,8 @@
                     this.error = 'Не указана группа или дата';
                     return;
                 }
+
+                console.log("Подгрузка недели " + weekStartDate);
                 const startApi = DateUtils.formatDateForApi(weekStartDate);
                 const endApi = DateUtils.formatDateForApi(DateUtils.addDays(weekStartDate, 6));
                 const cacheKey = repo.cacheKeyForWeek(this.groupName, startApi, endApi);
@@ -501,10 +507,13 @@
                 try {
                     if (direction === 'top') {
                         this.loadingTop = true;
+                        console.log("loadingTop = " + this.loadingTop);
                     } else if (direction === 'bottom') {
                         this.loadingBottom = true;
+                        console.log("loadingBottom = " + this.loadingBottom);
                     } else {
                         this.loading = true;
+                        console.log("loading = " + this.loading);
                     }
                     this.loadingDir = direction;
                     this.error = null;
@@ -545,11 +554,14 @@
                     this.loadingBottom = false;
                     this.loadingDir = null;
                     this.initialLoadDone = true;
+                    console.log("initialLoadDone");
                 }
             },
 
             // Вспомог: загрузить соседнюю неделю вверх/вниз относительно уже загруженного диапазона
             async loadMore(direction) {
+                console.log("Подгрузка расписания " + direction);
+
                 // direction: 'top' or 'bottom'
                 if (direction === 'top') {
                     if (this.loadingTop) return;
