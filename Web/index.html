@@ -5,6 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Расписание</title>
+    <link rel="stylesheet" href="static/swiper-bundle.min.css">
+    <script src="static/swiper-bundle.min.js.js"></script>
     <script src="static/alpine.js" defer></script>
     <script src="static/tailwind3.4.3.js"></script>
 </head>
@@ -37,14 +39,23 @@
                     <div class="flex items-center justify-between mb-4">
                         <button @click="prevWeek()" class="px-2 py-1 bg-white rounded shadow disabled:opacity-50"
                             :disabled="loading">&lt;</button>
-                        <div class="flex space-x-2">
-                            <template x-for="date in dateRange" :key="date">
-                                <button @click="onDateClick(date)" class="min-w-[40px] py-2 rounded shadow text-sm"
-                                    :class="isSelectedDate(date) ? 'bg-blue-100' : 'bg-white hover:bg-blue-50'"
-                                    :disabled="!hasSchedule(date) && loading">
-                                    <span x-text="formatDateShort(date)"></span>
-                                </button>
-                            </template>
+                        <div class="swiper w-full" x-ref="swiper">
+                            <div class="swiper-wrapper">
+                                <template x-for="(range, index) in dateRanges" :key="index">
+                                    <div class="swiper-slide">
+                                        <div class="flex space-x-2 justify-center">
+                                            <template x-for="date in range" :key="date">
+                                                <button @click="onDateClick(date)"
+                                                    class="min-w-[40px] py-2 rounded shadow text-sm"
+                                                    :class="isSelectedDate(date) ? 'bg-blue-100' : 'bg-white hover:bg-blue-50'"
+                                                    :disabled="!hasSchedule(date) && loading">
+                                                    <span x-text="formatDateShort(date)"></span>
+                                                </button>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
+                            </div>
                         </div>
                         <button @click="nextWeek()" class="px-2 py-1 bg-white rounded shadow disabled:opacity-50"
                             :disabled="loading">&gt;</button>
@@ -84,13 +95,13 @@
                                             <!-- Тип + кабинет + порядковый номер -->
                                             <div class="mt-2 flex flex-wrap items-center gap-2 text-sm">
                                                 <span
-                                                class="inline-block rounded-md bg-gray-50 ring-1 ring-gray-200 px-2 py-1 text-sm font-medium"
-                                                x-text="formatCabinet(lesson.cabinet)"></span>
+                                                    class="inline-block rounded-md bg-gray-50 ring-1 ring-gray-200 px-2 py-1 text-sm font-medium"
+                                                    x-text="formatCabinet(lesson.cabinet)"></span>
                                                 <span
-                                                class="inline-flex items-center rounded-full px-2 py-1 ring-1 font-medium"
-                                                :class="typeBadgeClass(lesson.type)" x-text="lesson.type"></span>
+                                                    class="inline-flex items-center rounded-full px-2 py-1 ring-1 font-medium"
+                                                    :class="typeBadgeClass(lesson.type)" x-text="lesson.type"></span>
                                                 <span class="text-gray-600"
-                                                x-text="formatSequence(lesson.sequencePosition, lesson.sequenceLength, lesson.type)"></span>
+                                                    x-text="formatSequence(lesson.sequencePosition, lesson.sequenceLength, lesson.type)"></span>
                                             </div>
 
                                             <!-- Подгруппа -->

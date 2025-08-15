@@ -13,3 +13,26 @@ For live server
   "StankinAppDatabase/**"
 ]
 ```
+
+Run
+```sh
+sudo npm install -g live-server
+sudo ufw allow 5173/tcp
+sudo ufw allow 5001/tcp
+
+# ip addr: 192.168.... -> тут сайт 192.168.0.103
+# + В `config:js` вставить ip.
+ip addr show  | grep inet
+
+cd .../StankinApp/Web/
+live-server --host=0.0.0.0 --port=5173
+
+dotnet run --urls "http://0.0.0.0:5001"
+```
+
+В api:
+
+```cs
+app.Urls.Add("http://192.168.0.103:5001");
+app.Urls.Add("https://192.168.0.103:5002");
+```

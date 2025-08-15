@@ -445,7 +445,8 @@
             loadingDir: null,
             error: null,
             weekStart: DateUtils.startOfWeek(new Date()),
-            dateRange: [],
+            dateRanges: [[], [], []],  // Новое свойство для трёх недель
+            swiperInstance: null,
             isEmptySchedule: true,
             groupedSchedule: {},
             loadingTop: false,
@@ -694,29 +695,38 @@
                 return DateUtils.calculateEndTime(startTime, duration);
             },
 
-            // Проверяет, есть ли в памяти записи об указанной дате
             hasSchedule(dateStr) {
                 return mem.hasDay(dateStr);
             },
-
             isSelectedDate(dateStr) {
-                // выбрана ли эта дата в карусели?
-                // Тут можно хранить lastSelectedDate; но template ожидает булево для подсветки
-                const today = new Date();
-                const sel = DateUtils.toIsoDate(today);
-                // в простейшем варианте подсвечиваем если это сегодня
-                // но лучше: подсвечиваем, если дата в текущем weekStart и равна weekStart + offset?
-                // Для удобства — подсвечиваем если dateStr === today или === first date в dateRange
                 return dateStr === DateUtils.toIsoDate(new Date());
             },
-
             prevWeek() {
-                this.weekStart = DateUtils.addDays(this.weekStart, -7);
-                this.updateDateRange();
+                if (this.swiperInstance) {
+                    this.swiperInstance.slidePrev();
+                }
             },
             nextWeek() {
-                this.weekStart = DateUtils.addDays(this.weekStart, 7);
-                this.updateDateRange();
+                if (this.swiperInstance) {
+                    this.swiperInstance.slideNext();
+                }
+            },
+            updateDateRanges() {
+                const prevStart = DateUtils.addDays(this.weekStart, -7);
+                this.dateRanges[0] = this.generateRange(prevStart);
+
+                this.dateRanges[1] = this.generateRange(this.weekStart);
+
+                const nextStart = DateUtils.addDays(this.weekStart, 7);
+                this.dateRanges[2] = this.generateRange(nextStart);
+            },
+            generateRange(start) {
+                const arr = [];
+                const d = DateUtils.startOfWeek(start);
+                for (let i = 0; i < 7; i++) {
+                    arr.push(DateUtils.toIsoDate(DateUtils.addDays(d, i)));
+                }
+                return arr;
             },
 
             // onDateClick должен:
@@ -743,6 +753,30 @@
 
             // Инициализация компонента (вызовется Alpine x-init="init()")
             async init() {
+                this.updateDateRanges();
+                this.$nextTick(() => {
+                    this.swiperInstance = new Swiper(this.$refs.swiper, {
+                        initialSlide: 1,
+                        slidesPerView: 1,
+                        speed: 400,
+                        runCallbacksOnInit: false,  // Add this line to prevent events from firing during initialization
+                        on: {
+                            slideChangeTransitionEnd: () => {
+                                const activeIndex = this.swiperInstance.activeIndex;
+                                if (activeIndex > 1) {
+                                    this.weekStart = DateUtils.addDays(this.weekStart, 7);
+                                    this.updateDateRanges();
+                                    this.swiperInstance.slideTo(1, 0);
+                                } else if (activeIndex < 1) {
+                                    this.weekStart = DateUtils.addDays(this.weekStart, -7);
+                                    this.updateDateRanges();
+                                    this.swiperInstance.slideTo(1, 0);
+                                }
+                            },
+                        },
+                    });
+                });
+
                 this.groupedSchedule = {};
                 this.isEmptySchedule = true;
 
