@@ -14,6 +14,11 @@ For live server
 ]
 ```
 
+Debug
+```
+chromium --remote-debugging-port=9222
+```
+
 Run
 ```sh
 sudo npm install -g live-server
