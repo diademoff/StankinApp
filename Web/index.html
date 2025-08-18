@@ -41,8 +41,6 @@
 
                 <div x-data="scheduleComponent(selectedGroup)" x-init="init()" class="flex flex-col min-h-0 flex-1">
                     <div class="flex items-center justify-between mb-4">
-                        <button @click="prevWeek()" class="px-2 py-1 bg-white rounded shadow disabled:opacity-50"
-                            :disabled="loading">&lt;</button>
                         <div class="swiper w-full" x-ref="swiper">
                             <div class="swiper-wrapper">
                                 <template x-for="(range, index) in dateRanges" :key="index">
@@ -61,8 +59,6 @@
                                 </template>
                             </div>
                         </div>
-                        <button @click="nextWeek()" class="px-2 py-1 bg-white rounded shadow disabled:opacity-50"
-                            :disabled="loading">&gt;</button>
                     </div>
                     <div x-ref="scheduleContainer" class="flex-1 min-h-0 overflow-y-auto">
                         <div x-show="loading && loadingDir==='top'" class="text-gray-600 text-center py-2">загрузка

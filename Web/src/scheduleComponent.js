@@ -36,6 +36,7 @@ export function scheduleComponent(groupNameInitial) {
         initialLoadDone: false,
         observerTop: null,
         observerBottom: null,
+        updating: false, // slider
 
         // Вспомогательные функции внутри компонента
         updateDateRange() {
@@ -337,24 +338,42 @@ export function scheduleComponent(groupNameInitial) {
         async init() {
             this.updateDateRanges();
             this.$nextTick(() => {
+                const self = this; // Контекст для обработчиков
                 this.swiperInstance = new Swiper(this.$refs.swiper, {
                     initialSlide: 1,
                     slidesPerView: 1,
                     speed: 400,
-                    runCallbacksOnInit: false,  // Add this line to prevent events from firing during initialization
+                    observeParents: true, // Автоматическое обновление при изменении DOM
+                    runCallbacksOnInit: false,
                     on: {
-                        slideChangeTransitionEnd: () => {
-                            const activeIndex = this.swiperInstance.activeIndex;
+                        slideChange: function () {
+                            const swiper = this;
+                            const activeIndex = swiper.activeIndex;
+                            console.log("SlideChange activeIndex:", activeIndex);
+
+                            // Защита от рекурсии
+                            if (self.updating) return;
+                            self.updating = true;
+
                             if (activeIndex > 1) {
-                                this.weekStart = DateUtils.addDays(this.weekStart, 7);
-                                this.updateDateRanges();
-                                this.swiperInstance.slideTo(1, 0);
+                                self.weekStart = DateUtils.addDays(self.weekStart, 7);
                             } else if (activeIndex < 1) {
-                                this.weekStart = DateUtils.addDays(this.weekStart, -7);
-                                this.updateDateRanges();
-                                this.swiperInstance.slideTo(1, 0);
+                                self.weekStart = DateUtils.addDays(self.weekStart, -7);
+                            } else {
+                                self.updating = false;
+                                return;
                             }
-                        },
+
+                            self.$nextTick(() => {
+                                setTimeout(() => {
+                                    if (self.updating){
+                                        swiper.slideTo(1, 0);
+                                        self.updating = false;
+                                        self.updateDateRanges();
+                                    }
+                                }, this.params.speed);
+                            });
+                        }
                     },
                 });
             });
