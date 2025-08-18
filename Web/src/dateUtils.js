@@ -56,9 +56,13 @@ class DateUtils {
 
     // Форматы для UI
     static formatDateHuman(d) {
-        return new Date(d).toLocaleDateString('ru-RU', { weekday: 'long', day: 'numeric', month: 'long' });
+        const dateStr = new Date(d).toLocaleDateString('ru-RU', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long'
+        });
+        return dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
     }
-
     static formatDateShort(d) {
         const x = new Date(d);
         const m = ['янв.', 'фев.', 'мар.', 'апр.', 'май', 'июн.', 'июл.', 'авг.', 'сен.', 'окт.', 'ноя.', 'дек.'];

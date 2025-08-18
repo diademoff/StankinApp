@@ -24,7 +24,21 @@ struct CourseDto
         this.GroupName = c.GroupName;
         this.Subject = c.Subject;
         this.Teacher = c.Teacher;
-        this.Type = c.Type;
+        switch (c.Type)
+        {
+            case "семинар":
+                this.Type = "Семинар";
+                break;
+            case "лекции":
+                this.Type = "Лекция";
+                break;
+            case "лабораторные занятия":
+                this.Type = "Лабораторная работа";
+                break;
+            default:
+                this.Type = c.Type;
+                break;
+        }
         this.Subgroup = c.Subgroup;
         this.Cabinet = c.Cabinet;
         this.SequencePosition = c.SequencePosition;
