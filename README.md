@@ -21,6 +21,11 @@ chromium --remote-debugging-port=9222
 
 Run
 ```sh
+npm install
+npm run dev
+```
+
+```sh
 sudo npm install -g live-server
 sudo ufw allow 5173/tcp
 sudo ufw allow 5001/tcp

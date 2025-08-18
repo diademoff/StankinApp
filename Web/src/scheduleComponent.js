@@ -4,6 +4,8 @@ import ScheduleRepository from './scheduleRepository.js';
 import ScheduleMemory from './scheduleMemory.js';
 import DateUtils from './dateUtils.js';
 import SCHEDULE_CONFIG from './config.js';
+import Swiper from 'swiper'
+import 'swiper/css'
 
 /* ==========================
    Alpine component для расписания конкретной группы
