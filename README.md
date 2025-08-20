@@ -46,3 +46,11 @@ dotnet run --urls "http://0.0.0.0:5001"
 app.Urls.Add("http://192.168.0.103:5001");
 app.Urls.Add("https://192.168.0.103:5002");
 ```
+
+
+Deploy
+```sh
+# StartupExtensions.cs set available ip
+# prometheus.yml и добавить API как таргет targets: ['192.168.0.103:5001']
+./prometheus --config.file=prometheus.yml
+```
