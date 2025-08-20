@@ -28,16 +28,16 @@
                         }
                         return result;
                     }
-                }">
+                }" class="flex flex-col min-h-0 flex-1">
                 <h1 class="text-2xl font-bold mb-4">Выберите группу</h1>
                 <template x-if="groups.length === 0">
                     <p>Загрузка групп...</p>
                 </template>
 
                 <template x-if="groups.length > 0">
-                    <div>
+                    <div class="flex flex-col min-h-0 flex-1">
                         <template x-for="(items, key) in groupedGroups" :key="key">
-                            <div class="mb-6 overflow-y-auto max-h-[90vh]">
+                            <div class="flex-1 min-h-0 overflow-y-auto">
                                 <h2 class="text-xl font-semibold mb-2">Группы 20<span x-text="key"></span>г</h2>
                                 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                                     <template x-for="group in items" :key="group">
