@@ -16,22 +16,43 @@
 <body class="h-full flex flex-col bg-gray-100 text-gray-800" x-data="scheduleApp" x-init="init()">
     <div class="flex-1 min-h-0 flex flex-col max-w-xl mx-auto w-full py-10 px-4">
         <template x-if="!selectedGroup">
-            <div>
+            <div x-data="{
+                    get groupedGroups() {
+                        const result = {};
+                        for (const g of this.groups) {
+                            const match = g.match(/-(\d{2})-/);
+                            if (!match) continue;
+                            const key = match[1];
+                            if (!result[key]) result[key] = [];
+                            result[key].push(g);
+                        }
+                        return result;
+                    }
+                }">
                 <h1 class="text-2xl font-bold mb-4">Выберите группу</h1>
                 <template x-if="groups.length === 0">
                     <p>Загрузка групп...</p>
                 </template>
+
                 <template x-if="groups.length > 0">
-                    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                        <template x-for="group in groups" :key="group">
-                            <button @click="selectGroup(group)"
-                                class="bg-white shadow hover:shadow-lg rounded-xl p-4 text-center text-sm font-medium transition-all duration-150 hover:bg-blue-50 active:scale-95">
-                                <span x-text="group"></span>
-                            </button>
+                    <div>
+                        <template x-for="(items, key) in groupedGroups" :key="key">
+                            <div class="mb-6 overflow-y-auto max-h-[90vh]">
+                                <h2 class="text-xl font-semibold mb-2">Группы 20<span x-text="key"></span>г</h2>
+                                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                                    <template x-for="group in items" :key="group">
+                                        <button @click="selectGroup(group)"
+                                            class="bg-white shadow hover:shadow-lg rounded-xl p-4 text-center text-sm font-medium transition-all duration-150 hover:bg-blue-50 active:scale-95">
+                                            <span x-text="group"></span>
+                                        </button>
+                                    </template>
+                                </div>
+                            </div>
                         </template>
                     </div>
                 </template>
             </div>
+
         </template>
         <template x-if="selectedGroup">
             <div class="flex flex-col min-h-0 flex-1">
@@ -138,7 +159,8 @@
                         </template>
 
                         <div x-ref="loadMoreBottom"></div>
-                        <div x-show="loading && loadingDir==='bottom'" class="text-gray-600 text-center py-2">⏳ Загрузка...</div>
+                        <div x-show="loading && loadingDir==='bottom'" class="text-gray-600 text-center py-2">⏳
+                            Загрузка...</div>
                     </div>
                 </div>
             </div>
