@@ -14,6 +14,11 @@ For live server
 ]
 ```
 
+IP адреса хранятся в:
+- `StankinAppDatabase/StankinAppApi/Program.cs`
+- `StankinAppDatabase/StankinAppApi/StartupExtensions.cs`
+- `Web/src/config.js`
+
 Debug
 ```
 chromium --remote-debugging-port=9222
