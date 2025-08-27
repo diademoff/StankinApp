@@ -13,6 +13,7 @@ COPY --from=frontend-builder /app/dist /usr/share/nginx/html
 # ваши конфиги nginx
 COPY ./deploy/nginx/conf.d/default.conf /etc/nginx/conf.d/default.conf
 COPY ./deploy/nginx/nginx.conf /etc/nginx/nginx.conf
+COPY ./deploy/nginx/proxy_params /etc/nginx/proxy_params
 
 # certs и webroot для certbot
 RUN mkdir -p /var/www/certbot /etc/letsencrypt

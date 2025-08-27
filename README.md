@@ -99,7 +99,16 @@ docker compose exec api curl -s http://localhost:5000/metrics | head
 docker-compose run --rm api sh
 ```
 
-```
+```md
 user: stankin:stankinapp
 su - stankin
+
+<!-- Получить сертификат -->
+sudo mkdir -p /etc/letsencrypt
+sudo certbot certonly --nginx -d stankinapp.ru --email diademoff@yandex.ru --agree-tos --non-interactive
+<!-- В корне репы -->
+sudo ln -sf /etc/letsencrypt ./deploy/certbot/conf || sudo rm -rf ./deploy/certbot/conf && sudo ln -sf /etc/letsencrypt ./deploy/certbot/conf
+
+<!-- Потом: Раскомментируйте HTTPS в Nginx и перезагрузит -->
+sudo certbot renew --dry-run
 ```

@@ -36,23 +36,3 @@ services:
                  sleep 6h;
                  nginx -s reload;
              done"
-
-  # Certbot для получения и обновления SSL
-  certbot:
-    image: certbot/certbot
-    container_name: certbot
-    volumes:
-      - ./deploy/certbot/conf:/etc/letsencrypt
-      - ./deploy/certbot/www:/var/www/certbot
-    depends_on:
-      - web
-    entrypoint: >
-      sh -c "trap 'exit 0' TERM INT;
-             certbot renew --webroot --webroot-path=/var/www/certbot
-             --keep-until-expiring --non-interactive --agree-tos
-             -m diademoff@yandex.ru
-             --deploy-hook 'nginx -s reload';
-             while true; do
-                 sleep 12h;
-                 certbot renew --quiet --no-random-sleep-on-renew;
-             done"

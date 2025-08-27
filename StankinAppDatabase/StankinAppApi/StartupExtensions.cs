@@ -9,7 +9,10 @@ namespace StankinAppApi;
 static class StartupExtensions
 {
     static string[] AvailableIp = [
-        "89.111.131.170"
+        "https://stankinapp.ru",
+        "https://www.stankinapp.ru",
+        "http://89.111.131.170:80",
+        "http://89.111.131.170:443"
     ];
     public static void ConfigureLogging(this WebApplicationBuilder builder)
     {
