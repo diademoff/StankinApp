@@ -1,4 +1,4 @@
-window.API_BASE_URL = 'http://192.168.1.210:5001';
+window.API_BASE_URL = 'http://89.111.131.170:5001';
 
 const SCHEDULE_CONFIG = {
     CACHE_PREFIX: 'scheduleCache:v1',

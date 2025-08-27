@@ -55,7 +55,51 @@ app.Urls.Add("https://192.168.0.103:5002");
 
 Deploy
 ```sh
+apt install docker docker-compose git npm nginx certbot
 # StartupExtensions.cs set available ip
 # prometheus.yml и добавить API как таргет targets: ['192.168.0.103:5001']
 ./prometheus --config.file=prometheus.yml
+
+# в корне репы
+mkdir -p data deploy/nginx/conf.d deploy/certbot/www deploy/certbot/conf
+# скопируйте sqlite в ./data/stankin.db
+scp /home/dmff/repos/StankinApp/dbBuilder/schedule.db stankin@89.111.131.170:/home/stankin/stankin.db
+
+
+# проверить путь к ssl файлам
+docker compose build --pull
+docker compose up -d
+```
+<!-- TODO -->
+Building api
+DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
+            Install the buildx component to build images with BuildKit:
+            https://docs.docker.com/go/buildx/
+
+### info
+```sh
+docker ps           # только запущенные
+docker ps -a        # все, включая остановленные
+docker start <container_id_or_name>    # запустить остановленный
+docker stop <container_id_or_name>     # остановить
+docker restart <container_id_or_name>  # перезапустить
+docker rm <container_id_or_name>       # удалить контейнер
+docker logs -f <container_id_or_name>   # непрерывный вывод
+docker exec -it <container_id_or_name> /bin/sh   # или /bin/bash
+docker compose up -d       # запуск всех сервисов в фоне
+docker compose down        # остановка и удаление контейнеров
+docker compose ps          # статус контейнеров
+docker compose logs -f     # вывод логов всех сервисов
+docker compose exec <service> /bin/sh  # попасть внутрь контейнера сервиса
+
+docker compose logs -f api
+docker compose logs -f web
+
+docker compose exec api curl -s http://localhost:5000/metrics | head
+docker-compose run --rm api sh
+```
+
+```
+user: stankin:stankinapp
+su - stankin
 ```

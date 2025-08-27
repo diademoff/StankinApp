@@ -2,7 +2,7 @@
 
 class Program
 {
-    static string IP = "192.168.1.210";
+    static string IP = "89.111.131.170";
     static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);
@@ -20,8 +20,9 @@ class Program
         app.UseCors("AllowFrontend");
         app.MapApi();
 
-        app.Urls.Add($"http://{IP}:5001");
-        app.Urls.Add($"https://{IP}:5002");
+        // app.Urls.Add($"http://{IP}:5001");
+        // app.Urls.Add($"https://{IP}:5002");
+        builder.WebHost.UseUrls("http://0.0.0.0:5000");
 
         app.Run();
     }

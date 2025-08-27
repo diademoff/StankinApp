@@ -8,7 +8,9 @@ namespace StankinAppApi;
 
 static class StartupExtensions
 {
-    static string[] AvailableIp = [];
+    static string[] AvailableIp = [
+        "89.111.131.170"
+    ];
     public static void ConfigureLogging(this WebApplicationBuilder builder)
     {
         Log.Logger = new LoggerConfiguration()
@@ -62,7 +64,7 @@ static class StartupExtensions
         builder.Services.AddCors(o => o.AddPolicy("AllowFrontend", p =>
             p.WithOrigins(AvailableIp)
                 .AllowAnyHeader()
-                .AllowAnyMethod();
+                .AllowAnyMethod()
         ));
 #endif
     }

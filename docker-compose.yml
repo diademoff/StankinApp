@@ -1,0 +1,58 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: StankinAppDatabase/StankinAppApi/Dockerfile
+    image: stankinapi:latest
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://0.0.0.0:5000
+      # Подстройте connection string под ваш код
+      - ConnectionStrings__Default=Data Source=/data/stankin.db
+    volumes:
+      - ./data/schedule.db:/data/schedule.db
+    expose:
+      - "5000"
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/nginx/Dockerfile
+    image: stankin-web:latest
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./deploy/certbot/conf:/etc/letsencrypt
+      - ./deploy/certbot/www:/var/www/certbot
+    restart: unless-stopped
+    command: >
+      sh -c "nginx -g 'daemon off;' &
+             while :; do
+                 sleep 6h;
+                 nginx -s reload;
+             done"
+
+  # Certbot для получения и обновления SSL
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    volumes:
+      - ./deploy/certbot/conf:/etc/letsencrypt
+      - ./deploy/certbot/www:/var/www/certbot
+    depends_on:
+      - web
+    entrypoint: >
+      sh -c "trap 'exit 0' TERM INT;
+             certbot renew --webroot --webroot-path=/var/www/certbot
+             --keep-until-expiring --non-interactive --agree-tos
+             -m diademoff@yandex.ru
+             --deploy-hook 'nginx -s reload';
+             while true; do
+                 sleep 12h;
+                 certbot renew --quiet --no-random-sleep-on-renew;
+             done"
