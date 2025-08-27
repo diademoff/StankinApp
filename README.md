@@ -55,7 +55,7 @@ app.Urls.Add("https://192.168.0.103:5002");
 
 Deploy
 ```sh
-apt install docker docker-compose git npm nginx certbot
+apt install docker docker-compose git npm nginx certbot python3-certbot-nginx
 # StartupExtensions.cs set available ip
 # prometheus.yml и добавить API как таргет targets: ['192.168.0.103:5001']
 ./prometheus --config.file=prometheus.yml

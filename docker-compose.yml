@@ -27,8 +27,7 @@ services:
       - "443:443"
     volumes:
       - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./deploy/certbot/conf:/etc/letsencrypt
-      - ./deploy/certbot/www:/var/www/certbot
+      - /etc/letsencrypt:/etc/letsencrypt
     restart: unless-stopped
     command: >
       sh -c "nginx -g 'daemon off;' &
