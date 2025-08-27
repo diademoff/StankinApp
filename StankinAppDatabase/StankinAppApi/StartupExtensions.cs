@@ -11,8 +11,8 @@ static class StartupExtensions
     static string[] AvailableIp = [
         "https://stankinapp.ru",
         "https://www.stankinapp.ru",
-        "http://89.111.131.170:80",
-        "http://89.111.131.170:443"
+        "https://89.111.131.170",
+        "http://89.111.131.170"
     ];
     public static void ConfigureLogging(this WebApplicationBuilder builder)
     {
