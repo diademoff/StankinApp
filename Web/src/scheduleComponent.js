@@ -13,7 +13,7 @@ import 'swiper/css'
    ========================== */
 export function scheduleComponent(groupNameInitial) {
     // Создаём объекты низкого уровня
-    const api = new ApiClient(window.API_BASE_URL || '');
+    const api = new ApiClient('');
     const cache = new LocalCache(SCHEDULE_CONFIG.CACHE_PREFIX);
     const repo = new ScheduleRepository(api, cache);
     const mem = new ScheduleMemory();

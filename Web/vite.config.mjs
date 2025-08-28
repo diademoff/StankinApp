@@ -2,7 +2,7 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
-  preview: { https: false, host: true },
+  preview: { https: true, host: true },
   plugins: [
     VitePWA({
       strategies: 'injectManifest',

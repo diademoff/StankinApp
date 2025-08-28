@@ -9,10 +9,8 @@ services:
       - ASPNETCORE_URLS=http://0.0.0.0:5000
       - Database__Path=/app/data/schedule.db  # Путь к БД внутри контейнера (override, если нужно)
     volumes:
-      - ./data:/app/data  # Bind-mount для persistent БД (на хосте: ./db-data/schedule.db)
+      - ./deploy/data:/app/data  # Bind-mount для persistent БД (на хосте: ./db-data/schedule.db)
     restart: unless-stopped
-    networks:
-      - backend
 
   web:
     build:

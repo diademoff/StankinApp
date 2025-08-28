@@ -1,7 +1,5 @@
-import SCHEDULE_CONFIG from './config.js';
-
 class ApiClient {
-    constructor(base = SCHEDULE_CONFIG.BASE_URL) {
+    constructor(base) {
         this.base = base ? base.replace(/\/$/, '') : '';
     }
 
