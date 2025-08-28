@@ -17,6 +17,9 @@ FROM mcr.microsoft.com/dotnet/runtime-deps:8.0 AS runtime
 WORKDIR /app
 COPY --from=build /app/publish .
 
+# Создаём директорию для БД (чтобы volume mount работал)
+RUN mkdir -p /app/data
+
 ENV ASPNETCORE_URLS=http://+:5000
 EXPOSE 5000
 

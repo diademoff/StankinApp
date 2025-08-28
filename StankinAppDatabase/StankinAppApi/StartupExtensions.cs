@@ -76,8 +76,17 @@ static class StartupExtensions
     public static void ConfigureServices(this WebApplicationBuilder builder)
     {
         builder.Services.AddMemoryCache();
+        // builder.Services.AddSingleton<IDataReader>(_ =>
+        //     new DatabaseReader(Path.GetFullPath("schedule.db"))
+        // );
+        var configuration = builder.Configuration; // Получаем конфигурацию
+
+        // Читаем путь из конфигурации (fallback на дефолтный, если не задан)
+        var dbPath = configuration.GetValue<string>("Database:Path") ?? "data/schedule.db";
+
+        // Регистрируем сервис с вычисленным полным путём
         builder.Services.AddSingleton<IDataReader>(_ =>
-            new DatabaseReader(Path.GetFullPath("schedule.db"))
+            new DatabaseReader(Path.GetFullPath(dbPath)) // Path.GetFullPath обеспечит абсолютный путь от /app
         );
     }
 

@@ -7,13 +7,12 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://0.0.0.0:5000
-      # Подстройте connection string под ваш код
-      - ConnectionStrings__Default=Data Source=/data/stankin.db
+      - Database__Path=/app/data/schedule.db  # Путь к БД внутри контейнера (override, если нужно)
     volumes:
-      - ./data/schedule.db:/data/schedule.db
-    expose:
-      - "5000"
+      - ./data:/app/data  # Bind-mount для persistent БД (на хосте: ./db-data/schedule.db)
     restart: unless-stopped
+    networks:
+      - backend
 
   web:
     build:
@@ -31,7 +30,7 @@ services:
     restart: unless-stopped
     command: >
       sh -c "nginx -g 'daemon off;' &
-             while :; do
+             while true; do
                  sleep 6h;
                  nginx -s reload;
              done"
