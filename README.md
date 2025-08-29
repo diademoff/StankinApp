@@ -112,3 +112,5 @@ sudo ln -sf /etc/letsencrypt ./deploy/certbot/conf || sudo rm -rf ./deploy/certb
 <!-- Потом: Раскомментируйте HTTPS в Nginx и перезагрузит -->
 sudo certbot renew --dry-run
 ```
+
+clean docker: `docker system prune -a -f`
