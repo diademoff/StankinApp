@@ -15,7 +15,7 @@ class ApiClient {
     }
 
     async getGroups() {
-        const url = `${this.base}/api/groups`;
+        const url = `/api/groups`;
         console.log("Отправка запроса на получение списка групп");
         return this.fetchJson(url);
     }
@@ -27,7 +27,7 @@ class ApiClient {
             startDate: startDateApi,
             endDate: endDateApi
         });
-        const url = `${this.base}/api/schedule?${params.toString()}`;
+        const url = `/api/schedule?${params.toString()}`;
         console.log("Отправка запроса на получение расписания " + params);
         return this.fetchJson(url);
     }
