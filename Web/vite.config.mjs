@@ -1,8 +1,17 @@
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { resolve } from 'path';
 
 export default defineConfig({
   preview: { https: true, host: true },
+  build: {
+    rollupOptions: {
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        about: resolve(__dirname, 'about.html'),
+      }
+    }
+  },
   plugins: [
     VitePWA({
       strategies: 'injectManifest',
@@ -15,7 +24,7 @@ export default defineConfig({
       },
       manifestCrossOrigin: 'use-credentials',
       manifestFilename: 'manifest.json',
-      includeAssets: ['**/*'],  // Кэширует всё из public/, включая иконки
+      includeAssets: ['**/*'],  // всё из public/
       registerType: 'autoUpdate',
       manifest: {
         name: 'Расписание',
@@ -36,4 +45,3 @@ export default defineConfig({
     })
   ]
 });
-
