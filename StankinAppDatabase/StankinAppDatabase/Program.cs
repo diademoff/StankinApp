@@ -1,81 +1,139 @@
 ﻿using System.CommandLine;
-using System.CommandLine.Parsing;
 using StankinAppCore;
 
 namespace StankinAppDatabase
 {
     public class Program
     {
-        const string DB_PATH = "schedule.db";
+        const string FALLBACK_PATH = "fallback_info.json";
 
-        static void Main(string[] args)
+        static async Task<int> Main(string[] args)
         {
-            var opt_path = new Option<string>(
-                name: "--path"
-            )
-            {
-                Description = "path to folder with json files"
-            }.AcceptLegalFilePathsOnly();
+            // Примеры использования
+            //args = new string[] 
+            //{
+            //    "read",
+            //    "--db-path",
+            //    "D:\\repos\\schedule.db"
+            //};
+            //args = new string[]
+            //{
+            //    "--help"
+            //};
+            //args = new string[]
+            //{   
+            //    "create",
+            //    "--help"
+            //};
+            //args = new string[]
+            //{   
+            //    "read",
+            //    "--help"
+            //};
+            //args = new string[] 
+            //{
+            //    "create",
+            //    "--json-path",
+            //    "D:\\repos\\json",
+            //    "--year",
+            //    "2025",
+            //    // Optional
+            //    "--db-save-path",
+            //    "D:\\database.db"
+            //};
 
-            var opt_year = new Option<int>(
-                name: "--year"
-            )
+            var rootCommand = new RootCommand("Утилита для работы с базой данных расписания");
+
+            // Команда создания БД
+            var jsonPathOption = new Option<DirectoryInfo>(
+                name: "--json-path")
             {
-                Description = "year of provided json files"
+                Description = "Путь к папке с JSON файлами",
+                Required = true
+            }.AcceptExistingOnly();
+
+            var yearOption = new Option<int>(
+                name: "--year")
+            {
+                Description = "Год обрабатываемых JSON файлов",
+                Required = true
             };
 
-            var rootCommand = new RootCommand("StankinAppDatabase");
-            rootCommand.Options.Add(opt_path);
-            rootCommand.Options.Add(opt_year);
-
-            ParseResult parseResult = rootCommand.Parse(args);
-
-            foreach (ParseError parseError in parseResult.Errors)
+            var dbSavePathOption = new Option<FileInfo>(
+                name: "--db-save-path")
             {
-                Console.Error.WriteLine(parseError.Message);
-            }
+                Description = "Путь для сохранения БД (по умолчанию schedule.db)",
+                DefaultValueFactory = _ => new FileInfo("schedule.db")
+            };
 
-            if(parseResult.GetValue(opt_path) is string parsed_path &&
-                parseResult.GetValue(opt_year) is int parsed_year)
+            var createCommand = new Command("create", "Создание БД из JSON файлов")
             {
-                Console.WriteLine($"Создание новой базы данных с переданными параметрами\n" +
-                $"path = {parsed_path}\nyear = {parsed_year}");
-                CreateDB(parsed_path, parsed_year);
-                Environment.Exit(0);
-            }
+                jsonPathOption,
+                yearOption,
+                dbSavePathOption
+            };
 
-
-            // Check if database exists
-            if (!File.Exists(DB_PATH))
+            createCommand.SetAction(args =>
             {
-                Console.WriteLine("База данных не найдена.");
-                Console.WriteLine("Положите файл базы данных " + DB_PATH);
-            }
-            else
-            {
-                Console.WriteLine("База данных найдена.");
-            }
+                CreateDatabase(args.GetValue(jsonPathOption), args.GetValue(yearOption), args.GetValue(dbSavePathOption));
+            });
 
-            // Start the UI
-            var ui = new UI(new DatabaseReader(DB_PATH));
-            ui.Run();
+            // Команда чтения БД
+            var dbOpenPathOption = new Option<FileInfo>(
+                name: "--db-path")
+            {
+                Description = "Путь к файлу БД для чтения",
+                Required = true
+            }.AcceptExistingOnly();
+
+            var readCommand = new Command("read", "Чтение существующей БД")
+            {
+                dbOpenPathOption
+            };
+            readCommand.SetAction(args => 
+            {
+                ReadDatabase(args.GetValue(dbOpenPathOption));
+            });
+
+            rootCommand.Subcommands.Add(createCommand);
+            rootCommand.Subcommands.Add(readCommand);
+
+            return await rootCommand.Parse(args).InvokeAsync();
         }
 
-        public static void CreateDB(string path, int year)
+        static void CreateDatabase(DirectoryInfo jsonPath, int year, FileInfo dbSavePath)
         {
-            Console.WriteLine("База данных не найдена. Создание новой базы данных...");
-            var HandleParseError = HandleErrorMethods.HandleParseError2025;
-            HandleErrorMethods.year = year;
-            DatabaseScraper builder = new(year, HandleParseError, DB_PATH);
+            Console.WriteLine($"Создание новой базы данных:\n" +
+                $"JSON Path: {jsonPath}\n" +
+                $"Year: {year}\n" +
+                $"DB Save Path: {dbSavePath}");
 
-            var _reader = new ScheduleJsonReader(year, (_) => []);
-            //Create database schema
+            ParserFallback fallback = new(year, FALLBACK_PATH);
+            var handleParseError = fallback.ParseFallbackFunc;
+
+            var builder = new DatabaseScraper(year, handleParseError, dbSavePath.FullName);
+
             Console.WriteLine("Создание схемы базы данных...");
             builder.CreateSchema();
-            //Process all JSON files and populate the database
+
             Console.WriteLine("Обработка JSON файлов...");
-            builder.ProcessFolder(path);
+            builder.ProcessFolder(jsonPath.FullName);
+
             Console.WriteLine("База данных успешно создана!");
+        }
+
+        static void ReadDatabase(FileInfo dbPath)
+        {
+            Console.WriteLine($"Чтение базы данных: {dbPath}");
+
+            if (!dbPath.Exists)
+            {
+                Console.Error.WriteLine("Ошибка: Файл базы данных не существует");
+                return;
+            }
+
+            var ui = new UI(new DatabaseReader(dbPath.FullName));
+            ui.Run();
         }
     }
 }

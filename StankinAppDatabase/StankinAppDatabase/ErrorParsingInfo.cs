@@ -1,4 +1,5 @@
 ﻿using NodaTime;
+using StankinAppCore;
 
 namespace StankinAppDatabase
 {
@@ -8,5 +9,6 @@ namespace StankinAppDatabase
         public string GroupName;
         public LocalTime StartTime;
         public Period Duration;
+        public List<Course> FailedToParseCourses;
     }
 }

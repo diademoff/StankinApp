@@ -11,8 +11,7 @@ namespace StankinAppDatabase.Tests
         [SetUp]
         public void Setup()
         {
-            HandleErrorMethods.year = 2025;
-            _reader = new ScheduleJsonReader(2025, HandleErrorMethods.HandleParseError2025);
+            _reader = new ScheduleJsonReader(2025, null);
             _time = new NodaTime.LocalTime(12, 20);
             _period = NodaTime.Period.FromTicks(1000);
             _group = "grp";

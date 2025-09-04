@@ -2,14 +2,13 @@ using Newtonsoft.Json.Linq;
 using NodaTime;
 using NodaTime.Text;
 using StankinAppCore;
-using System.Globalization;
 using System.Text.RegularExpressions;
 
 namespace StankinAppDatabase
 {
     public class ScheduleJsonReader(int currentYear, Func<ErrorParsingInfo, Course[]> parseError)
     {
-        private static readonly HashSet<string> AllowedLessonTypes = ["лекции", "семинар", "лабораторные занятия"];
+        private static readonly HashSet<string> AllowedLessonTypes = ["лекции", "семинар", "лабораторные занятия", "Лекция", "Семинар", "Лабораторная"];
         int currentYear = currentYear;
 
         readonly Func<ErrorParsingInfo, Course[]> parseError = parseError;
@@ -90,7 +89,7 @@ namespace StankinAppDatabase
             return Regex.Replace(subject, @"-\s+", "-");
         }
 
-        public List<Course> ParseLessons(string lessonLine, LocalTime startTime, Period duration, string groupName, bool throwOnFail=false)
+        public List<Course> ParseLessons(string lessonLine, LocalTime startTime, Period duration, string groupName, bool throwOnFail = false)
         {
             if (lessonLine is null)
                 throw new NullReferenceException($"{nameof(lessonLine)} is null");
@@ -140,6 +139,7 @@ namespace StankinAppDatabase
                 return [.. parseError(new ErrorParsingInfo()
                 {
                     LineToParse = lessonLine,
+                    FailedToParseCourses = entries,
                     GroupName = groupName,
                     StartTime = startTime,
                     Duration = duration
