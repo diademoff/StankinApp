@@ -216,6 +216,51 @@ export function scheduleComponent(groupNameInitial) {
             }
         },
 
+        async scrollToDate(dateStr, maxAttempts, attemptDelay) {
+            const container = this.$refs?.scheduleContainer;
+            if (!container) {
+                console.warn('Scroll container not found');
+                return;
+            }
+
+            // Функция для попытки прокрутки
+            const tryScroll = async (attempt = 1) => {
+                await new Promise(resolve => setTimeout(resolve, attemptDelay));
+
+                const el = container.querySelector(`#date-${dateStr}`);
+                if (!el) {
+                    if (attempt < maxAttempts) {
+                        console.log(`Date element #date-${dateStr} not found, retrying (${attempt}/${maxAttempts})`);
+                        return tryScroll(attempt + 1);
+                    }
+                    console.warn(`Date element #date-${dateStr} not found after ${maxAttempts} attempts`);
+                    return;
+                }
+
+                try {
+                    el.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+                    console.log(`Scrolled to date ${dateStr}`);
+                } catch (e) {
+                    console.error('scrollIntoView failed:', e);
+                    const top = el.offsetTop - container.offsetTop;
+                    container.scrollTo({ top, behavior: 'smooth' });
+                    console.log(`Fallback scroll to date ${dateStr}`);
+                }
+            };
+
+            // Убедимся, что неделя загружена
+            const clickedDate = new Date(dateStr + 'T00:00:00');
+            const weekStart = DateUtils.startOfWeek(clickedDate);
+            if (!this.ensureWeekIsLoadedInMemory(weekStart)) {
+                console.log(`Loading week for ${dateStr}`);
+                await this.loadWeek(weekStart, 'initial');
+                this.updateGroupedSchedule();
+            }
+
+            // Запускаем попытки прокрутки
+            await tryScroll();
+        },
+
         // Инициализация intersection observers для бесконечной прокрутки
         setupObservers() {
             const container = this.$refs.scheduleContainer;
@@ -395,6 +440,10 @@ export function scheduleComponent(groupNameInitial) {
                 // Однако refs могут быть ещё не привязаны — поэтому делаем небольшой таймаут на рендер
                 await new Promise(r => requestAnimationFrame(r));
                 this.setupObservers();
+
+                // Прокрутка к текущей дате с максимум 5 попытками
+                const now = DateUtils.toIsoDate(new Date());
+                await this.scrollToDate(now, 5, 100);
             } catch (e) {
                 console.error('initial load failed', e);
             } finally {
@@ -419,11 +468,8 @@ export function scheduleComponent(groupNameInitial) {
         typeBadgeClass(typeRaw) {
             const t = (typeRaw || '').toLowerCase();
             if (t.includes('лекц')) return 'bg-blue-50 text-blue-700 ring-blue-200';
-            //if (t.includes('практ')) return 'bg-green-50 text-green-700 ring-green-200';
-            if (t.includes('лаб')) return 'bg-amber-50 text-amber-700 ring-amber-200';
+            if (t.includes('лаб')) return 'bg-green-50 text-green-700 ring-green-200';
             if (t.includes('сем')) return 'bg-purple-50 text-purple-700 ring-purple-200';
-            //if (t.includes('экзам')) return 'bg-red-50 text-red-700 ring-red-200';
-            //if (t.includes('зач')) return 'bg-emerald-50 text-emerald-700 ring-emerald-200';
             return 'bg-gray-50 text-gray-700 ring-gray-200';
         },
 
