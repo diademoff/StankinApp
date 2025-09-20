@@ -216,7 +216,7 @@ export function scheduleComponent(groupNameInitial) {
             }
         },
 
-        async scrollToDate(dateStr, maxAttempts, attemptDelay) {
+        async scrollToDate(dateStr, maxAttempts = 5, attemptDelay = 200) {  // Увеличил delay до 200 мс для стабильности
             const container = this.$refs?.scheduleContainer;
             if (!container) {
                 console.warn('Scroll container not found');
@@ -363,16 +363,13 @@ export function scheduleComponent(groupNameInitial) {
         //  - проскроллить к дате
         async onDateClick(dateStr) {
             try {
-                // dateStr = 'YYYY-MM-DD'
                 const clicked = new Date(dateStr + 'T00:00:00');
                 const weekStart = DateUtils.startOfWeek(clicked);
-                // Загружаем неделю (если не загружена)
                 if (!this.ensureWeekIsLoadedInMemory(weekStart)) {
                     await this.loadWeek(weekStart, 'initial');
                 }
-                // Обновлённый groupedSchedule готов — плавно скроллим
-                await this.scrollToDate(dateStr);
-                // обновляем groupedSchedule чтобы Alpine подхватил изменения
+                // Обновлённый groupedSchedule готов — плавно скроллим с попытками
+                await this.scrollToDate(dateStr, 5, 200);  // Добавили параметры
                 this.updateGroupedSchedule();
             } catch (e) {
                 console.error('onDateClick error', e);
@@ -411,7 +408,7 @@ export function scheduleComponent(groupNameInitial) {
 
                             self.$nextTick(() => {
                                 setTimeout(() => {
-                                    if (self.updating){
+                                    if (self.updating) {
                                         swiper.slideTo(1, 0);
                                         self.updating = false;
                                         self.updateDateRanges();
@@ -436,6 +433,7 @@ export function scheduleComponent(groupNameInitial) {
                 // mem = new ScheduleMemory() — но это const; аккуратно: просто оставим mem пустым
                 // Загрузим week start
                 await this.loadWeek(this.weekStart, 'initial');
+                this.updateGroupedSchedule();
                 // После первой загрузки настроим observers
                 // Однако refs могут быть ещё не привязаны — поэтому делаем небольшой таймаут на рендер
                 await new Promise(r => requestAnimationFrame(r));
@@ -443,11 +441,11 @@ export function scheduleComponent(groupNameInitial) {
 
                 // Прокрутка к текущей дате с максимум 5 попытками
                 const now = DateUtils.toIsoDate(new Date());
-                await this.scrollToDate(now, 5, 100);
+                await this.$nextTick();
+                await this.scrollToDate(now, 5, 200);
             } catch (e) {
                 console.error('initial load failed', e);
             } finally {
-                this.updateGroupedSchedule();
             }
         },
 
