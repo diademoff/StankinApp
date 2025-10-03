@@ -2,7 +2,7 @@
 
 class Program
 {
-    static string IP = "89.111.131.170";
+    // static string IP = "89.111.131.170";
     static void Main(string[] args)
     {
         var builder = WebApplication.CreateBuilder(args);

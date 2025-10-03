@@ -76,42 +76,47 @@ static class StartupExtensions
     public static void ConfigureServices(this WebApplicationBuilder builder)
     {
         builder.Services.AddMemoryCache();
-        // builder.Services.AddSingleton<IDataReader>(_ =>
-        //     new DatabaseReader(Path.GetFullPath("schedule.db"))
-        // );
+
         var configuration = builder.Configuration; // Получаем конфигурацию
 
         // Читаем путь из конфигурации (fallback на дефолтный, если не задан)
         var dbPath = configuration.GetValue<string>("Database:Path") ?? "data/schedule.db";
 
+#if DEBUG
+        dbPath = "schedule.db";
+#endif
+
         // Регистрируем сервис с вычисленным полным путём
         builder.Services.AddSingleton<IDataReader>(_ =>
             new DatabaseReader(Path.GetFullPath(dbPath)) // Path.GetFullPath обеспечит абсолютный путь от /app
         );
+
+        // Add the new service layer
+        builder.Services.AddSingleton<IScheduleService, ScheduleService>();
     }
 
     public static void MapApi(this WebApplication app)
     {
-        app.MapGet("/api/groups", (IDataReader db, ILogger<Program> log) =>
+        app.MapGet("/api/groups", (IScheduleService service, ILogger<Program> log) =>
         {
             log.LogInformation("GET /api/groups");
-            return Results.Json(db.GetGroups());
+            return Results.Json(service.GetGroups());
         });
 
-        app.MapGet("/api/rooms", (IDataReader db, ILogger<Program> log) =>
+        app.MapGet("/api/rooms", (IScheduleService service, ILogger<Program> log) =>
         {
             log.LogInformation("GET /api/rooms");
-            return Results.Json(db.GetRooms());
+            return Results.Json(service.GetRooms());
         });
 
-        app.MapGet("/api/teachers", (IDataReader db, ILogger<Program> log) =>
+        app.MapGet("/api/teachers", (IScheduleService service, ILogger<Program> log) =>
         {
             log.LogInformation("GET /api/teachers");
-            return Results.Json(db.GetTeachers());
+            return Results.Json(service.GetTeachers());
         });
 
         app.MapGet("/api/schedule", (string groupName, string startDate, string endDate,
-                                     IDataReader db, IMemoryCache cache, ILogger<Program> log) =>
+                                     IScheduleService service, IMemoryCache cache, ILogger<Program> log) =>
         {
             if (string.IsNullOrWhiteSpace(groupName) ||
                 string.IsNullOrWhiteSpace(startDate) ||
@@ -127,8 +132,7 @@ static class StartupExtensions
             {
                 try
                 {
-                    schedule = db.GetScheduleForGroup(groupName, startDate, endDate)
-                                 .Select(x => new CourseDto(x));
+                    schedule = service.GetMergedScheduleForGroup(groupName, startDate, endDate);
                     cache.Set(key, schedule, TimeSpan.FromHours(2));
                     log.LogInformation("Fetched from DB & cached: {Key}", key);
                 }

@@ -10,37 +10,37 @@ namespace StankinAppDatabase
         static async Task<int> Main(string[] args)
         {
             // Примеры использования
-            //args = new string[] 
-            //{
+            // args = new string[]
+            // {
             //    "read",
             //    "--db-path",
-            //    "D:\\repos\\schedule.db"
-            //};
+            //    "schedule.db"
+            // };
             //args = new string[]
             //{
             //    "--help"
             //};
             //args = new string[]
-            //{   
+            //{
             //    "create",
             //    "--help"
             //};
             //args = new string[]
-            //{   
+            //{
             //    "read",
             //    "--help"
             //};
-            //args = new string[] 
-            //{
-            //    "create",
-            //    "--json-path",
-            //    "D:\\repos\\json",
-            //    "--year",
-            //    "2025",
+            args = new string[]
+            {
+               "create",
+               "--json-path",
+               "/home/dmff/repos/StankinApp/pdfparser/json",
+               "--year",
+               "2025",
             //    // Optional
             //    "--db-save-path",
             //    "D:\\database.db"
-            //};
+            };
 
             var rootCommand = new RootCommand("Утилита для работы с базой данных расписания");
 
@@ -90,7 +90,7 @@ namespace StankinAppDatabase
             {
                 dbOpenPathOption
             };
-            readCommand.SetAction(args => 
+            readCommand.SetAction(args =>
             {
                 ReadDatabase(args.GetValue(dbOpenPathOption));
             });

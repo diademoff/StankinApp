@@ -2,17 +2,17 @@ using StankinAppCore;
 
 namespace StankinAppApi;
 
-struct CourseDto
+public struct CourseDto
 {
     public SimpleTime StartTime { get; set; }
     public DurationType Duration { get; set; }
-    public List<SimpleDate>? Dates { get; set; }
-    public string? GroupName { get; set; }
-    public string? Subject { get; set; }
-    public string? Teacher { get; set; }
-    public string? Type { get; set; }
-    public string? Subgroup { get; set; }
-    public string? Cabinet { get; set; }
+    public List<SimpleDate> Dates { get; set; }
+    public string GroupName { get; set; }
+    public string Subject { get; set; }
+    public string Teacher { get; set; }
+    public string Type { get; set; }
+    public string Subgroup { get; set; }
+    public string Cabinet { get; set; }
     public int SequencePosition { get; set; }
     public int SequenceLength { get; set; }
 

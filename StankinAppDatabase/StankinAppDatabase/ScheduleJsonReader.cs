@@ -109,7 +109,9 @@ namespace StankinAppDatabase
                     var teacher = match.Groups["teacher"].Success ? match.Groups["teacher"].Value.Trim() : "";
                     var type = match.Groups["type"].Value.Trim();
                     var subgroup = match.Groups["subgroup"].Success ? match.Groups["subgroup"].Value.Trim() : "";
-                    var cabinet = match.Groups["cabinet"].Value.Trim();
+                    var cabinet = match.Groups["cabinet"].Value.Trim()
+                        .Replace("- ", "-")
+                        .Replace(") ", ")");
                     var datesString = match.Groups["dates"].Value.Trim();
                     var dates = ParseSchedule(datesString, currentYear) ?? throw new ArgumentNullException();
 
