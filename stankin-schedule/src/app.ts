@@ -5,6 +5,7 @@ import { HttpScheduleRepository } from './infra/repositories/HttpScheduleReposit
 import { LoadGroupsUseCase } from './core/use-cases/LoadGroupsUseCase';
 import { LoadScheduleWeekUseCase } from './core/use-cases/LoadScheduleWeekUseCase';
 import { scheduleApp } from './ui/pages/scheduleApp';
+import { scheduleComponent } from './ui/components/scheduleComponent';
 
 const api = new ApiClient('http://localhost:5000');
 const cache = new LocalStorageCache();
@@ -15,8 +16,11 @@ const scheduleRepo = new HttpScheduleRepository(api, cache);
 const loadGroupsUseCase = new LoadGroupsUseCase(groupRepo);
 const loadScheduleUseCase = new LoadScheduleWeekUseCase(scheduleRepo);
 
-// Alpine registration
 document.addEventListener('alpine:init', () => {
   // @ts-ignore
   Alpine.data('scheduleApp', () => scheduleApp(loadGroupsUseCase, loadScheduleUseCase));
+  // @ts-ignore
+  Alpine.data('scheduleComponent', (groupName: string) =>
+    scheduleComponent(groupName, loadScheduleUseCase)
+  );
 });

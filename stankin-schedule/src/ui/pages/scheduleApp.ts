@@ -3,30 +3,32 @@ import { LoadScheduleWeekUseCase } from '../../core/use-cases/LoadScheduleWeekUs
 
 export function scheduleApp(
   loadGroupsUseCase: LoadGroupsUseCase,
-  loadScheduleUseCase: LoadScheduleWeekUseCase
+  _loadScheduleUseCase: LoadScheduleWeekUseCase
 ) {
   return {
     groups: [] as string[],
     selectedGroup: null as string | null,
-    loadingGroups: false,
     error: null as string | null,
+    loadingGroups: false,
 
     async init() {
+      console.log('scheduleApp.init called');
+      await this.loadGroups();
       const saved = localStorage.getItem('selectedGroup');
-      if (saved) {
-        this.selectedGroup = saved;
-      } else {
-        await this.loadGroups();
-      }
+      if (saved) this.selectedGroup = saved;
     },
 
     async loadGroups() {
+      console.log('scheduleApp.loadGroups called');
       this.loadingGroups = true;
+      this.error = null;
       try {
-        this.groups = await loadGroupsUseCase.execute();
+        const groups = await loadGroupsUseCase.execute();
+        console.log('groups from API:', groups);
+        this.groups = Array.isArray(groups) ? groups : [];
       } catch (e) {
-        this.error = 'Не удалось загрузить группы';
-        console.error(e);
+        console.error('loadGroups error', e);
+        this.error = 'Не удалось загрузить список групп';
       } finally {
         this.loadingGroups = false;
       }
@@ -34,12 +36,12 @@ export function scheduleApp(
 
     selectGroup(group: string) {
       this.selectedGroup = group;
-      localStorage.setItem('selectedGroup', group);
+      try { localStorage.setItem('selectedGroup', group); } catch {}
     },
 
     reset() {
       this.selectedGroup = null;
-      localStorage.removeItem('selectedGroup');
+      try { localStorage.removeItem('selectedGroup'); } catch {}
     }
   };
 }
