@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ru" class="h-full">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Обсуждение преподавателя</title>
+  <meta name="theme-color" content="#4A90E2" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.jpg" />
+  <script type="module" src="/src/main.ts"></script>
+</head>
+
+<body class="h-full flex flex-col bg-gray-100 text-gray-800" x-data="teacherDiscussionApp" x-init="init()">
+  <div class="flex-1 min-h-0 flex flex-col max-w-xl mx-auto w-full py-10 px-4 space-y-6">
+    <template x-if="teacher">
+      <header class="text-center">
+        <h1 class="text-3xl font-bold" x-text="teacher.name"></h1>
+        <div class="flex items-center justify-center text-xl mt-2">
+          <span class="text-yellow-500 mr-1">⭐</span>
+          <span class="font-bold" x-text="teacher.averageRating"></span>
+          <span class="text-gray-500 text-sm ml-2" x-text="`(${teacher.totalRatings} оценок)`"></span>
+        </div>
+      </header>
+    </template>
+    <!-- TODO: make page -->
+    <template x-if="!teacher">
+        <p class="text-center">Загрузка данных о преподавателе...</p>
+    </template>
+
+    <section class="bg-white rounded-2xl shadow p-4 sm:p-6 space-y-4">
+      <template x-if="!user.loggedIn">
+        <div>
+          <h2 class="text-xl font-semibold text-center mb-2">Присоединяйтесь к обсуждению!</h2>
+          <p class="text-center text-gray-600 mb-4">Войдите, чтобы поставить оценку и оставить комментарий.</p>
+          <button @click="login()"
+            class="w-full flex items-center justify-center gap-2 bg-blue-500 text-white font-bold py-3 px-4 rounded-xl hover:bg-blue-600 transition-all duration-150 active:scale-95">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+            </svg>
+            Войти через Telegram
+          </button>
+        </div>
+      </template>
+
+      <template x-if="user.loggedIn">
+        <div class="space-y-4">
+          <div>
+            <h3 class="font-semibold mb-2">Ваша оценка:</h3>
+            <div class="flex items-center space-x-1">
+              <template x-for="star in 5" :key="star">
+                <button @click="rateTeacher(star)" class="text-2xl transition-transform duration-150 hover:scale-125" :class="user.ownRating >= star ? 'text-yellow-400' : 'text-gray-300'">★</button>
+              </template>
+            </div>
+          </div>
+          <div>
+            <h3 class="font-semibold mb-2">Оставить комментарий 💬</h3>
+            <textarea x-model="newCommentText" rows="3" placeholder="Поделитесь своим мнением..." class="w-full border-gray-300 rounded-xl p-2 focus:ring-2 focus:ring-blue-400"></textarea>
+            <button @click="addComment()" :disabled="!newCommentText.trim()" class="mt-2 bg-blue-500 text-white font-semibold py-2 px-4 rounded-xl hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed">Отправить</button>
+          </div>
+        </div>
+      </template>
+    </section>
+
+    <section class="space-y-4">
+        <h2 class="text-xl font-semibold">Комментарии</h2>
+        <template x-for="comment in sortedComments" :key="comment.id">
+            <div class="bg-white rounded-2xl shadow p-4">
+                <div class="flex items-start gap-3">
+                    <div class="flex flex-col items-center">
+                        <button @click="voteComment(comment.id, 1)" class="text-gray-400 hover:text-green-500" :class="{'text-green-500': comment.userVote === 1}">▲</button>
+                        <span class="font-bold text-sm" x-text="comment.votes" :class="{'text-green-600': comment.votes > 0, 'text-red-600': comment.votes < 0}"></span>
+                        <button @click="voteComment(comment.id, -1)" class="text-gray-400 hover:text-red-500" :class="{'text-red-500': comment.userVote === -1}">▼</button>
+                    </div>
+                    <div class="flex-1">
+                        <p class="font-semibold" x-text="comment.author"></p>
+                        <p class="text-gray-800" x-text="comment.content"></p>
+                        <div class="text-xs text-gray-500 mt-1">
+                            <span x-text="comment.createdAt"></span>
+                            <button @click="showReplyForm = (showReplyForm === comment.id ? null : comment.id)" class="ml-4 font-semibold hover:underline">Ответить</button>
+                        </div>
+
+                        <div x-show="showReplyForm === comment.id" class="mt-2">
+                           <textarea x-model="newReplyText[comment.id]" rows="2" placeholder="Ваш ответ..." class="w-full border-gray-300 rounded-xl p-2 text-sm focus:ring-2 focus:ring-blue-400"></textarea>
+                           <button @click="addReply(comment.id)" :disabled="!(newReplyText[comment.id] || '').trim()" class="mt-1 bg-gray-600 text-white text-xs font-semibold py-1 px-3 rounded-lg hover:bg-gray-700 disabled:bg-gray-300">Ответить</button>
+                        </div>
+
+                        <div x-show="comment.replies && comment.replies.length > 0" class="mt-3 pl-4 border-l-2 border-gray-200 space-y-3">
+                            <template x-for="reply in comment.replies" :key="reply.id">
+                                <div>
+                                    <p class="font-semibold text-sm" x-text="reply.author"></p>
+                                    <p class="text-gray-700 text-sm" x-text="reply.content"></p>
+                                    <p class="text-xs text-gray-500 mt-1" x-text="reply.createdAt"></p>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </template>
+    </section>
+
+  </div>
+  <footer class="text-center text-sm text-gray-500 py-1">
+    <a href="/index.html" class="text-xs text-gray-600 hover:text-blue-600 hover:underline transition">
+     ← Назад к расписанию
+    </a>
+  </footer>
+</body>
+
+</html>

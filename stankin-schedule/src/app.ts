@@ -6,6 +6,7 @@ import { LoadGroupsUseCase } from './core/use-cases/LoadGroupsUseCase';
 import { LoadScheduleWeekUseCase } from './core/use-cases/LoadScheduleWeekUseCase';
 import { scheduleApp } from './ui/pages/scheduleApp';
 import { scheduleComponent } from './ui/components/scheduleComponent';
+import { teacherDiscussionApp } from './ui/pages/teacherDiscussionApp';
 
 const api = new ApiClient('http://localhost:5000');
 const cache = new LocalStorageCache();
@@ -23,4 +24,6 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('scheduleComponent', (groupName: string) =>
     scheduleComponent(groupName, loadScheduleUseCase)
   );
+  // @ts-ignore
+  Alpine.data('teacherDiscussionApp', () => teacherDiscussionApp());
 });

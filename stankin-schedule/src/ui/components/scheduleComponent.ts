@@ -5,6 +5,36 @@ import { ScheduleMemory } from '../../shared/scheduleMemory';
 import Swiper from 'swiper';
 import 'swiper/css';
 
+interface TopComment {
+  id: number;
+  content: string;
+  votes: number;
+}
+
+interface RatingData {
+  id: number;
+  avg: number | '-'; // потому что у "Не указан" стоит '-'
+  count: number;
+  topComments: TopComment[];
+}
+
+// TODO: ЗАГЛУШКА: Данные по рейтингам, которые в будущем придут с API
+const MOCK_RATINGS_DATA: Record<string, RatingData> = {
+  'Иванов И.И.': {
+    id: 1, avg: 4.8, count: 125, topComments: [
+      { id: 101, content: 'Лучший преподаватель по Web-приложениям!', votes: 42 },
+      { id: 102, content: 'Материал сложный, но лекции интересные.', votes: 15 },
+    ]
+  },
+  'Аристархов П.В.': {
+    id: 2, avg: 4.5, count: 98, topComments: [
+      { id: 201, content: 'Хорошо объясняет физику, наглядно и с примерами.', votes: 25 },
+    ]
+  },
+  'Не указан': { id: 0, avg: '-', count: 0, topComments: [] }
+};
+
+
 export function scheduleComponent(
   groupName: string,
   loadScheduleUseCase: LoadScheduleWeekUseCase
@@ -27,6 +57,8 @@ export function scheduleComponent(
     observerTop: null as IntersectionObserver | null,
     observerBottom: null as IntersectionObserver | null,
     updating: false,
+    isDiscussionModalOpen: false,
+    selectedLessonForModal: null as Lesson | null,
 
     updateGroupedSchedule() {
       this.groupedSchedule = mem.asGroupedObject();
@@ -316,6 +348,32 @@ export function scheduleComponent(
 
     destroy() {
       this.disconnectObservers();
-    }
+    },
+
+    openDiscussionModal(lesson: Lesson) {
+      if (!lesson.teacher) return; // Не открывать окно, если преподаватель не указан
+      this.selectedLessonForModal = lesson;
+      this.isDiscussionModalOpen = true;
+      console.log("Открыт DiscussionModal для ", lesson);
+    },
+
+    closeDiscussionModal() {
+      this.isDiscussionModalOpen = false;
+    },
+
+    getTeacherRating(teacherName: string) {
+      return MOCK_RATINGS_DATA[teacherName] || { avg: 'N/A', count: 0 };
+    },
+
+    getTopComments(teacherName: string) {
+      if (!teacherName || !MOCK_RATINGS_DATA[teacherName]) {
+        return [];
+      }
+      return MOCK_RATINGS_DATA[teacherName].topComments.slice(0, 3);
+    },
+
+    getTeacherId(teacherName: string) {
+      return MOCK_RATINGS_DATA[teacherName]?.id || 0;
+    },
   };
 }

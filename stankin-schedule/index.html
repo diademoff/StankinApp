@@ -178,7 +178,7 @@
                     <div class="text-gray-600 text-center py-2">Пар нет</div>
                   </template>
                   <template x-for="lesson in entry[1]" :key="lessonKey(entry[0], lesson)">
-                    <div
+                    <div @click="openDiscussionModal(lesson)"
                       class="group relative rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 p-4 hover:shadow-md focus-within:ring-2 focus-within:ring-blue-400 transition"
                       :aria-label="`Занятие: ${lesson.subject}`">
                       <!-- Предмет + время -->
@@ -211,8 +211,14 @@
                       </div>
 
                       <!-- Преподаватель -->
-                      <div class="mt-2 text-sm text-gray-800">
+                      <div class="mt-2 text-sm text-gray-800 flex items-center justify-between">
                         <span x-text="'🎓 ' + (lesson.teacher || 'Не указан')"></span>
+                        <template x-if="lesson.teacher">
+                          <div class="flex items-center text-xs bg-gray-100 rounded-full px-2 py-1">
+                            <span class="text-yellow-500 mr-1">⭐</span>
+                            <span class="font-semibold" x-text="getTeacherRating(lesson.teacher).avg"></span>
+                          </div>
+                        </template>
                       </div>
                     </div>
                   </template>
@@ -222,6 +228,44 @@
 
             <div x-ref="loadMoreBottom"></div>
             <div x-show="loading && loadingDir === 'bottom'" class="text-gray-600 text-center py-2">⏳ Загрузка...</div>
+
+            <template x-if="isDiscussionModalOpen">
+              <div @click="closeDiscussionModal()"
+                class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[100] overflow-y-auto">
+                <div @click.stop class="bg-white rounded-2xl shadow-lg p-6 w-full max-w-md space-y-4">
+                  <div class="text-center">
+                    <h2 class="text-xl font-bold" x-text="selectedLessonForModal?.teacher || 'Преподаватель не указан'">
+                    </h2>
+                    <div class="flex items-center justify-center text-lg mt-1">
+                      <span class="text-yellow-500 mr-1">⭐</span>
+                      <span class="font-bold" x-text="getTeacherRating(selectedLessonForModal?.teacher).avg"></span>
+                      <span class="text-gray-500 text-sm ml-2"
+                        x-text="`(${getTeacherRating(selectedLessonForModal?.teacher).count} оценок)`"></span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 class="font-semibold mb-2">🔥 Популярные мнения:</h3>
+                    <div class="space-y-3">
+                      <template x-for="comment in getTopComments(selectedLessonForModal?.teacher)" :key="comment.id">
+                        <div class="bg-gray-50 rounded-lg p-3">
+                          <p class="text-sm text-gray-800" x-text="comment.content"></p>
+                          <p class="text-xs text-right font-bold text-green-600" x-text="`👍 ${comment.votes}`"></p>
+                        </div>
+                      </template>
+                      <template x-if="getTopComments(selectedLessonForModal?.teacher).length === 0">
+                        <p class="text-sm text-gray-500 text-center">Комментариев пока нет. Будьте первым!</p>
+                      </template>
+                    </div>
+                  </div>
+
+                  <a :href="`teacher-discussion.html?teacherId=${getTeacherId(selectedLessonForModal?.teacher)}`"
+                    class="block w-full text-center bg-blue-500 text-white font-bold py-3 px-4 rounded-xl hover:bg-blue-600 transition-all duration-150 active:scale-95">
+                    Перейти к обсуждению
+                  </a>
+                </div>
+              </div>
+            </template>
           </div>
         </div>
       </div>
