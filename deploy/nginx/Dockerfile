@@ -1,9 +1,9 @@
 # build frontend
 FROM node:18-alpine AS frontend-builder
 WORKDIR /app
-COPY ./Web/package*.json ./
+COPY ./stankin-schedule/package*.json ./
 RUN npm ci --silent
-COPY ./Web/ .
+COPY ./stankin-schedule/ .
 RUN npm run build
 
 # nginx serving static + reverse proxy
