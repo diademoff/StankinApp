@@ -28,7 +28,7 @@ public class TeacherRatingController : ControllerBase
 
     [HttpPost("{teacherId}/ratings")]
     [Authorize]
-    public async Task<IActionResult> CreateRating(int teacherId, [FromBody] CreateRatingRequest request)
+    public async Task<IActionResult> CreateRating(string teacherName, [FromBody] CreateRatingRequest request)
     {
         try
         {
@@ -42,47 +42,43 @@ public class TeacherRatingController : ControllerBase
                 return BadRequest(new ErrorResponse { Error = "Score must be 1-10." });
             }
 
-            // Get teacher name from schedule service
-            var teachers = _scheduleService.GetTeachers();
-            var teacherName = teachers.ElementAtOrDefault(teacherId - 1); // Assuming teacherId is 1-based index
-
             if (string.IsNullOrEmpty(teacherName))
             {
                 return NotFound(new ErrorResponse { Error = "Teacher not found" });
             }
 
-            var result = await _ratingService.CreateOrUpdateRatingAsync(userId, teacherId, teacherName, request.Score);
+            var result = await _ratingService.CreateOrUpdateRatingAsync(userId, teacherName, request.Score);
 
             _logger.LogInformation("User {UserId} rated teacher {TeacherId} with score {Score}",
-                userId, teacherId, request.Score);
+                userId, teacherName, request.Score);
 
             return Ok(new ApiResponse<RatingResponse> { Data = result });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating rating for teacher {TeacherId}", teacherId);
+            _logger.LogError(ex, "Error creating rating for teacher {TeacherId}", teacherName);
             return StatusCode(500, new ErrorResponse { Error = "Internal server error" });
         }
     }
 
     [HttpGet("{teacherId}/ratings")]
-    public async Task<IActionResult> GetRatings(int teacherId)
+    public async Task<IActionResult> GetRatings(string teacherName)
     {
         try
         {
-            var result = await _ratingService.GetTeacherRatingsAsync(teacherId);
+            var result = await _ratingService.GetTeacherRatingsAsync(teacherName);
             return Ok(new ApiResponse<RatingAggregateResponse> { Data = result });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting ratings for teacher {TeacherId}", teacherId);
+            _logger.LogError(ex, "Error getting ratings for teacher {TeacherId}", teacherName);
             return StatusCode(500, new ErrorResponse { Error = "Internal server error" });
         }
     }
 
     [HttpPost("{teacherId}/comments")]
     [Authorize]
-    public async Task<IActionResult> CreateComment(int teacherId, [FromBody] CreateCommentRequest request)
+    public async Task<IActionResult> CreateComment(string teacherName, [FromBody] CreateCommentRequest request)
     {
         try
         {
@@ -101,20 +97,16 @@ public class TeacherRatingController : ControllerBase
                 return BadRequest(new ErrorResponse { Error = "Comment content cannot exceed 5000 characters" });
             }
 
-            // Get teacher name
-            var teachers = _scheduleService.GetTeachers();
-            var teacherName = teachers.ElementAtOrDefault(teacherId - 1);
-
             if (string.IsNullOrEmpty(teacherName))
             {
                 return NotFound(new ErrorResponse { Error = "Teacher not found" });
             }
 
             var commentId = await _ratingService.CreateCommentAsync(
-                userId, teacherId, teacherName, request.Content, request.Anonymous);
+                userId, teacherName, teacherName, request.Content, request.Anonymous);
 
             _logger.LogInformation("User {UserId} created comment {CommentId} for teacher {TeacherId}",
-                userId, commentId, teacherId);
+                userId, commentId, teacherName);
 
             return Ok(new ApiResponse<CommentResponse>
             {
@@ -123,22 +115,73 @@ public class TeacherRatingController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating comment for teacher {TeacherId}", teacherId);
+            _logger.LogError(ex, "Error creating comment for teacher {TeacherId}", teacherName);
             return StatusCode(500, new ErrorResponse { Error = "Internal server error" });
         }
     }
 
     [HttpGet("{teacherId}/comments")]
-    public async Task<IActionResult> GetComments(int teacherId, [FromQuery] int page = 1, [FromQuery] int limit = 20)
+    public async Task<IActionResult> GetComments(string teacherName, [FromQuery] int page = 1, [FromQuery] int limit = 20)
     {
         try
         {
-            var result = await _ratingService.GetTeacherCommentsAsync(teacherId, page, limit);
+            var result = await _ratingService.GetTeacherCommentsAsync(teacherName, page, limit);
             return Ok(new ApiResponse<CommentsPageResponse> { Data = result });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting comments for teacher {TeacherId}", teacherId);
+            _logger.LogError(ex, "Error getting comments for teacher {TeacherId}", teacherName);
+            return StatusCode(500, new ErrorResponse { Error = "Internal server error" });
+        }
+    }
+
+
+    [HttpPost("by-name/ratings")]
+    [Authorize]
+    public async Task<IActionResult> CreateRatingByName([FromBody] CreateRatingRequest request)
+    {
+        try
+        {
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (userIdStr == null) return Unauthorized();
+            var userId = int.Parse(userIdStr);
+
+            if (string.IsNullOrWhiteSpace(request.TeacherName))
+                return BadRequest(new ErrorResponse { Error = "Teacher name is required" });
+
+            if (request.Score < 1 || request.Score > 10)
+                return BadRequest(new ErrorResponse { Error = "Score must be 1-10." });
+
+            // 🔑 Валидация: есть ли такой преподаватель в расписании?
+            var validTeachers = _scheduleService.GetTeachers();
+            if (!validTeachers.Contains(request.TeacherName, StringComparer.OrdinalIgnoreCase))
+                return NotFound(new ErrorResponse { Error = "Преподаватель не найден в расписании" });
+
+            var result = await _ratingService.CreateOrUpdateRatingAsync(userId, request.TeacherName, request.Score);
+            _logger.LogInformation("User {UserId} rated teacher '{TeacherName}' with score {Score}", userId, request.TeacherName, request.Score);
+            return Ok(new ApiResponse<RatingResponse> { Data = result });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating rating for teacher '{TeacherName}'", request?.TeacherName);
+            return StatusCode(500, new ErrorResponse { Error = "Internal server error" });
+        }
+    }
+
+    [HttpGet("by-name/ratings")]
+    public async Task<IActionResult> GetRatingsByName([FromQuery] string name)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return BadRequest(new ErrorResponse { Error = "Missing 'name' parameter" });
+
+            var result = await _ratingService.GetTeacherRatingsAsync(name);
+            return Ok(new ApiResponse<RatingAggregateResponse> { Data = result });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting ratings for teacher '{TeacherName}'", name);
             return StatusCode(500, new ErrorResponse { Error = "Internal server error" });
         }
     }

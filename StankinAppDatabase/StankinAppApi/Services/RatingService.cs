@@ -70,67 +70,49 @@ public class RatingService : IRatingService
         );
     }
 
-    public async Task<RatingResponse> CreateOrUpdateRatingAsync(int userId, int teacherId, string teacherName, int score)
+    public async Task<RatingResponse> CreateOrUpdateRatingAsync(int userId, string teacherName, int score)
     {
         if (score < 1 || score > 10)
-        {
             throw new ArgumentException("Score must be between 1 and 10");
-        }
 
         using var connection = CreateConnection();
-
-        // Check if rating exists
-        var existingRating = await connection.QueryFirstOrDefaultAsync<Rating>(
-            @"SELECT * FROM ""Ratings""
-              WHERE ""UserId"" = @UserId AND ""TeacherId"" = @TeacherId",
-            new { UserId = userId, TeacherId = teacherId }
+        var existing = await connection.QueryFirstOrDefaultAsync<Rating>(
+            @"SELECT * FROM ""Ratings"" WHERE ""UserId"" = @UserId AND ""TeacherName"" = @TeacherName",
+            new { UserId = userId, TeacherName = teacherName }
         );
 
-        if (existingRating != null)
+        if (existing != null)
         {
-            // Update existing rating
             await connection.ExecuteAsync(
-                @"UPDATE ""Ratings""
-                  SET ""Score"" = @Score, ""TeacherName"" = @TeacherName
-                  WHERE ""Id"" = @Id",
-                new { Id = existingRating.Id, Score = score, TeacherName = teacherName }
+                @"UPDATE ""Ratings"" SET ""Score"" = @Score WHERE ""Id"" = @Id",
+                new { Id = existing.Id, Score = score }
             );
         }
         else
         {
-            // Create new rating
             await connection.ExecuteAsync(
-                @"INSERT INTO ""Ratings"" (""UserId"", ""TeacherId"", ""TeacherName"", ""Score"")
-                  VALUES (@UserId, @TeacherId, @TeacherName, @Score)",
-                new { UserId = userId, TeacherId = teacherId, TeacherName = teacherName, Score = score }
+                @"INSERT INTO ""Ratings"" (""UserId"", ""TeacherName"", ""Score"") VALUES (@UserId, @TeacherName, @Score)",
+                new { UserId = userId, TeacherName = teacherName, Score = score }
             );
         }
-
-        return new RatingResponse { TeacherId = teacherId, Score = score };
+        return new RatingResponse { Score = score }; // Убираем TeacherId
     }
 
-    public async Task<RatingAggregateResponse> GetTeacherRatingsAsync(int teacherId)
+    public async Task<RatingAggregateResponse> GetTeacherRatingsAsync(string teacherName)
     {
         using var connection = CreateConnection();
-
         var result = await connection.QueryFirstOrDefaultAsync<dynamic>(
-            @"SELECT
-                COUNT(*) as count,
-                AVG(CAST(""Score"" AS DECIMAL)) as average
-              FROM ""Ratings""
-              WHERE ""TeacherId"" = @TeacherId",
-            new { TeacherId = teacherId }
+            @"SELECT COUNT(*) as count, AVG(CAST(""Score"" AS DECIMAL)) as average FROM ""Ratings"" WHERE ""TeacherName"" = @TeacherName",
+            new { TeacherName = teacherName }
         );
-
         return new RatingAggregateResponse
         {
-            TeacherId = teacherId,
             AverageScore = result?.average ?? 0.0,
             RatingsCount = (int)(result?.count ?? 0)
         };
     }
 
-    public async Task<int> CreateCommentAsync(int userId, int teacherId, string teacherName, string content, bool anonymous)
+    public async Task<int> CreateCommentAsync(int userId, string teacherId, string teacherName, string content, bool anonymous)
     {
         if (string.IsNullOrWhiteSpace(content))
         {
@@ -161,7 +143,7 @@ public class RatingService : IRatingService
         return commentId;
     }
 
-    public async Task<CommentsPageResponse> GetTeacherCommentsAsync(int teacherId, int page, int limit)
+    public async Task<CommentsPageResponse> GetTeacherCommentsAsync(string teacherName, int page, int limit)
     {
         if (page < 1) page = 1;
         if (limit < 1 || limit > 100) limit = 20;
@@ -171,8 +153,8 @@ public class RatingService : IRatingService
         // Get total count
         var total = await connection.QuerySingleAsync<int>(
             @"SELECT COUNT(*) FROM ""Comments""
-              WHERE ""TeacherId"" = @TeacherId AND ""IsDeleted"" = false",
-            new { TeacherId = teacherId }
+              WHERE ""TeacherName"" = @TeacherName AND ""IsDeleted"" = false",
+            new { TeacherName = teacherName }
         );
 
         // Get paginated comments with votes
@@ -191,12 +173,12 @@ public class RatingService : IRatingService
               FROM ""Comments"" c
               INNER JOIN ""Users"" u ON c.""UserId"" = u.""Id""
               LEFT JOIN ""CommentVotes"" v ON c.""Id"" = v.""CommentId""
-              WHERE c.""TeacherId"" = @TeacherId AND c.""IsDeleted"" = false
+              WHERE c.""TeacherName"" = @TeacherName AND c.""IsDeleted"" = false
               GROUP BY c.""Id"", c.""UserId"", c.""Content"", c.""Anonymous"", c.""CreatedAt"",
                        u.""FirstName"", u.""Username"", u.""PhotoUrl""
               ORDER BY c.""CreatedAt"" DESC
               LIMIT @Limit OFFSET @Offset",
-            new { TeacherId = teacherId, Limit = limit, Offset = offset }
+            new { TeacherName = teacherName, Limit = limit, Offset = offset }
         );
 
         var commentDtos = new List<CommentDto>();

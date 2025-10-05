@@ -1,5 +1,5 @@
 export class ApiClient {
-  constructor(private base: string) {}
+  constructor(private base: string) { }
 
   private getAuthHeaders(): Record<string, string> {
     const token = localStorage.getItem('jwt_token');
@@ -87,6 +87,41 @@ export class ApiClient {
       method: 'POST',
       headers: this.getAuthHeaders(),
       body: JSON.stringify({ vote }),
+    });
+  }
+
+  async validateTeacher(teacherName: string): Promise<boolean> {
+    const url = `${this.base}/api/teachers/validate?name=${encodeURIComponent(teacherName)}`;
+    const response = await this.fetchJson(url);
+    return response.exists === true;
+  }
+
+  async getTeacherRatingsByName(teacherName: string): Promise<any> {
+    const url = `${this.base}/api/teachers/by-name/ratings?name=${encodeURIComponent(teacherName)}`;
+    return this.fetchJson(url);
+  }
+
+  async getTeacherCommentsByName(teacherName: string, page = 1, limit = 20): Promise<any> {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
+    const url = `${this.base}/api/teachers/by-name/comments?name=${encodeURIComponent(teacherName)}&${params.toString()}`;
+    return this.fetchJson(url);
+  }
+
+  async postRatingByName(teacherName: string, score: number): Promise<any> {
+    const url = `${this.base}/api/teachers/by-name/ratings`;
+    return this.fetchJson(url, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ teacherName, score }),
+    });
+  }
+
+  async postCommentByName(teacherName: string, content: string, anonymous: boolean): Promise<any> {
+    const url = `${this.base}/api/teachers/by-name/comments`;
+    return this.fetchJson(url, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ teacherName, content, anonymous }),
     });
   }
 }

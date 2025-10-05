@@ -205,5 +205,15 @@ static class StartupExtensions
 
             return Results.Json(schedule);
         });
+
+        app.MapGet("/api/teachers/validate", (string name, IScheduleService service, ILogger<Program> log) =>
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return Results.BadRequest(new { error = "Missing 'name' parameter" });
+
+            var exists = service.GetTeachers().Contains(name, StringComparer.OrdinalIgnoreCase);
+            log.LogInformation("Validated teacher '{TeacherName}': {Exists}", name, exists);
+            return Results.Json(new { exists });
+        });
     }
 }
