@@ -1,0 +1,25 @@
+meta {
+  name: Create Rating
+  type: http
+  seq: 11
+}
+
+post {
+  url: http://localhost:5000/api/teachers/1/ratings
+  body: json
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{jwt_token}}
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "score": 8
+  }
+}
