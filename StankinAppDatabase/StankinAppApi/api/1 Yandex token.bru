@@ -1,0 +1,21 @@
+meta {
+  name: 1 Yandex token
+  type: http
+  seq: 10
+}
+
+post {
+  url: http://localhost:5000/api/auth/yandex/token
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "AccessToken": "y0__xCt1e29Aoic2Tog5r-_zRvGtL_19il5BKT80zwBDYO9zrmCZQ"
+  }
+}

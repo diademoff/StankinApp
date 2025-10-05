@@ -12,4 +12,5 @@ public interface IRatingService
     Task<int> CreateCommentAsync(int userId, string teacherName, string content, bool anonymous);
     Task<CommentsPageResponse> GetTeacherCommentsAsync(string teacherName, int page, int limit);
     Task<VoteResponse> VoteForCommentAsync(int userId, int commentId, int vote);
+    Task<int> GetUserRatingAsync(int userId, string teacherName);
 }

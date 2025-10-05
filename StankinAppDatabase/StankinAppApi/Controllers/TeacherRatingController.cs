@@ -26,7 +26,7 @@ public class TeacherRatingController : ControllerBase
         _logger = logger;
     }
 
-    [HttpPost("/api/teachers/by-name/comments")]
+    [HttpPost("by-name/comments")]
     [Authorize]
     public async Task<IActionResult> CreateComment(string name, [FromBody] CreateCommentRequest request)
     {
@@ -70,7 +70,7 @@ public class TeacherRatingController : ControllerBase
         }
     }
 
-    [HttpGet("/api/teachers/by-name/comments")]
+    [HttpGet("by-name/comments")]
     public async Task<IActionResult> GetComments(string name, [FromQuery] int page = 1, [FromQuery] int limit = 20)
     {
         try
@@ -132,6 +132,29 @@ public class TeacherRatingController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error getting ratings for teacher '{TeacherName}'", name);
+            return StatusCode(500, new ErrorResponse { Error = "Internal server error" });
+        }
+    }
+
+    [HttpGet("by-name/user-rating")]
+    [Authorize]
+    public async Task<IActionResult> GetUserRatingForTeacher(string name)
+    {
+        try
+        {
+            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (userIdStr == null) return Unauthorized();
+            var userId = int.Parse(userIdStr);
+
+            var rating = await _ratingService.GetUserRatingAsync(userId, name);
+            return Ok(new ApiResponse<UserRatingResponse>
+            {
+                Data = new UserRatingResponse { Score = rating }
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting user rating for teacher {TeacherName}", name);
             return StatusCode(500, new ErrorResponse { Error = "Internal server error" });
         }
     }

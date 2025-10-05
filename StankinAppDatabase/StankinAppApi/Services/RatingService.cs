@@ -1,7 +1,4 @@
-using System;
-using System.Collections.Generic;
 using System.Data;
-using System.Threading.Tasks;
 using Dapper;
 using Microsoft.Extensions.Logging;
 using Npgsql;
@@ -29,20 +26,25 @@ public class RatingService : IRatingService
         using var connection = CreateConnection();
         try
         {
-            var id = await connection.QueryFirstOrDefaultAsync<int>(
+            // Сначала пытаемся найти существующего преподавателя
+            var existingId = await connection.QueryFirstOrDefaultAsync<int?>(
                 @"SELECT ""Id"" FROM Teachers WHERE ""Name"" = @Name",
                 new { Name = teacherName }
             );
 
-            if (id == 0)
+            if (existingId.HasValue && existingId.Value > 0)
             {
-                id = await connection.QuerySingleAsync<int>(
-                    @"INSERT INTO Teachers (""Name"") VALUES (@Name) RETURNING ""Id""",
-                    new { Name = teacherName }
-                );
-                _logger.LogInformation("Created new teacher in PostgreSQL: {TeacherName} with ID {Id}", teacherName, id);
+                return existingId.Value;
             }
-            return id;
+
+            // Если не нашли - создаем нового
+            var newId = await connection.QuerySingleAsync<int>(
+                @"INSERT INTO Teachers (""Name"") VALUES (@Name) RETURNING ""Id""",
+                new { Name = teacherName }
+            );
+
+            _logger.LogInformation("Created new teacher in PostgreSQL: {TeacherName} with ID {Id}", teacherName, newId);
+            return newId;
         }
         catch (Exception ex)
         {
@@ -331,5 +333,57 @@ public class RatingService : IRatingService
         }
 
         return new VoteResponse { CommentId = commentId, Vote = vote };
+    }
+
+    public async Task<int> GetUserRatingAsync(int userId, string teacherName)
+    {
+        try
+        {
+            // Получаем teacherId без создания нового преподавателя
+            var teacherId = await GetTeacherIdWithoutCreationAsync(teacherName);
+            if (teacherId == null)
+            {
+                _logger.LogInformation("Teacher {TeacherName} not found for user rating query", teacherName);
+                return 0; // Если преподавателя нет, значит пользователь не ставил оценку
+            }
+
+            using var connection = CreateConnection();
+
+            var rating = await connection.QueryFirstOrDefaultAsync<int?>(
+                @"SELECT ""Score"" FROM ""Ratings""
+              WHERE ""UserId"" = @UserId AND ""TeacherId"" = @TeacherId",
+                new { UserId = userId, TeacherId = teacherId }
+            );
+
+            _logger.LogDebug("User {UserId} rating for teacher {TeacherName}: {Rating}",
+                userId, teacherName, rating ?? 0);
+
+            return rating ?? 0; // Возвращаем 0 если оценка не найдена
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting user rating for user {UserId}, teacher {TeacherName}",
+                userId, teacherName);
+            throw;
+        }
+    }
+
+    // 🔧 Вспомогательный метод для получения teacherId без создания
+    private async Task<int?> GetTeacherIdWithoutCreationAsync(string teacherName)
+    {
+        using var connection = CreateConnection();
+        try
+        {
+            var id = await connection.QueryFirstOrDefaultAsync<int?>(
+                @"SELECT ""Id"" FROM Teachers WHERE ""Name"" = @Name",
+                new { Name = teacherName }
+            );
+            return id;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting TeacherId for {TeacherName} without creation", teacherName);
+            return null;
+        }
     }
 }

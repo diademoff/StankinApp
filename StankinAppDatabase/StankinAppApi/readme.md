@@ -106,4 +106,12 @@ CREATE TRIGGER update_comments_updated_at BEFORE UPDATE ON "Comments"
 
 CREATE TRIGGER update_comment_votes_updated_at BEFORE UPDATE ON "CommentVotes"
     FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+
+-- Добавляем индекс для быстрого поиска оценок пользователя по преподавателю
+CREATE INDEX IF NOT EXISTS idx_ratings_user_teacher
+ON "Ratings" ("UserId", "TeacherId");
+
+-- Индекс для поиска преподавателей по имени
+CREATE INDEX IF NOT EXISTS idx_teachers_name
+ON Teachers ("Name");
 ```

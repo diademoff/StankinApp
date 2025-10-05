@@ -74,35 +74,6 @@ export class ApiClient {
     return this.fetchJson(url);
   }
 
-  async getTeacherRatings(teacherId: number): Promise<any> {
-    const url = `${this.base}/api/teachers/${teacherId}/ratings`;
-    return this.fetchJson(url);
-  }
-
-  async getTeacherComments(teacherId: number, page = 1, limit = 20): Promise<any> {
-    const params = new URLSearchParams({ page: String(page), limit: String(limit) });
-    const url = `${this.base}/api/teachers/${teacherId}/comments?${params.toString()}`;
-    return this.fetchJson(url);
-  }
-
-  async postRating(teacherId: number, score: number): Promise<any> {
-    const url = `${this.base}/api/teachers/${teacherId}/ratings`;
-    return this.fetchJson(url, {
-      method: 'POST',
-      headers: this.getAuthHeaders(),
-      body: JSON.stringify({ score }),
-    });
-  }
-
-  async postComment(teacherId: number, content: string, anonymous: boolean): Promise<any> {
-    const url = `${this.base}/api/teachers/${teacherId}/comments`;
-    return this.fetchJson(url, {
-      method: 'POST',
-      headers: this.getAuthHeaders(),
-      body: JSON.stringify({ content, anonymous }),
-    });
-  }
-
   async postVote(commentId: number, vote: 1 | -1): Promise<any> {
     const url = `${this.base}/api/comments/${commentId}/vote`;
     return this.fetchJson(url, {
@@ -130,26 +101,28 @@ export class ApiClient {
   }
 
   async postRatingByName(teacherName: string, score: number): Promise<any> {
-    const response = await fetch(`${this.baseUrl}/teachers/${encodeURIComponent(teacherName)}/ratings`, {
-      method: 'POST',
-      headers: this.getHeaders(),
-      body: JSON.stringify({ score })
-    });
-    if (!response.ok) {
-      const error = await response.json();
-      console.error('ApiClient: postRating failed', error); // Logger: error
-      throw new Error(error.message || 'Failed to post rating');
-    }
-    console.log('ApiClient: postRating successful'); // Validation: success
-    return response.json();
-  }
-
-  async postCommentByName(teacherName: string, content: string, anonymous: boolean): Promise<any> {
-    const url = `${this.base}/api/teachers/by-name/comments`;
+    const url = `${this.base}/api/teachers/by-name/ratings`;
+    const b = JSON.stringify({ teacherName, score })
     return this.fetchJson(url, {
       method: 'POST',
       headers: this.getAuthHeaders(),
-      body: JSON.stringify({ teacherName, content, anonymous }),
+      body: b,
+    });
+  }
+
+  async postCommentByName(teacherName: string, content: string, anonymous: boolean): Promise<any> {
+    const url = `${this.base}/api/teachers/by-name/comments?name=${encodeURIComponent(teacherName)}`;
+    return this.fetchJson(url, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify({ content, anonymous }),
+    });
+  }
+
+  async getUserRatingForTeacher(teacherName: string): Promise<any> {
+    const url = `${this.base}/api/teachers/by-name/user-rating?name=${encodeURIComponent(teacherName)}`;
+    return this.fetchJson(url, {
+      headers: this.getAuthHeaders(),
     });
   }
 }
