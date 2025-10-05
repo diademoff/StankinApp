@@ -26,59 +26,9 @@ public class TeacherRatingController : ControllerBase
         _logger = logger;
     }
 
-    [HttpPost("{teacherId}/ratings")]
+    [HttpPost("/api/teachers/by-name/comments")]
     [Authorize]
-    public async Task<IActionResult> CreateRating(string teacherName, [FromBody] CreateRatingRequest request)
-    {
-        try
-        {
-            var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            if (userIdStr == null) return Unauthorized();
-            var userId = int.Parse(userIdStr);
-
-            // Validate score
-            if (request.Score < 1 || request.Score > 10)
-            {
-                return BadRequest(new ErrorResponse { Error = "Score must be 1-10." });
-            }
-
-            if (string.IsNullOrEmpty(teacherName))
-            {
-                return NotFound(new ErrorResponse { Error = "Teacher not found" });
-            }
-
-            var result = await _ratingService.CreateOrUpdateRatingAsync(userId, teacherName, request.Score);
-
-            _logger.LogInformation("User {UserId} rated teacher {TeacherId} with score {Score}",
-                userId, teacherName, request.Score);
-
-            return Ok(new ApiResponse<RatingResponse> { Data = result });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error creating rating for teacher {TeacherId}", teacherName);
-            return StatusCode(500, new ErrorResponse { Error = "Internal server error" });
-        }
-    }
-
-    [HttpGet("{teacherId}/ratings")]
-    public async Task<IActionResult> GetRatings(string teacherName)
-    {
-        try
-        {
-            var result = await _ratingService.GetTeacherRatingsAsync(teacherName);
-            return Ok(new ApiResponse<RatingAggregateResponse> { Data = result });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Error getting ratings for teacher {TeacherId}", teacherName);
-            return StatusCode(500, new ErrorResponse { Error = "Internal server error" });
-        }
-    }
-
-    [HttpPost("{teacherId}/comments")]
-    [Authorize]
-    public async Task<IActionResult> CreateComment(string teacherName, [FromBody] CreateCommentRequest request)
+    public async Task<IActionResult> CreateComment(string name, [FromBody] CreateCommentRequest request)
     {
         try
         {
@@ -97,16 +47,16 @@ public class TeacherRatingController : ControllerBase
                 return BadRequest(new ErrorResponse { Error = "Comment content cannot exceed 5000 characters" });
             }
 
-            if (string.IsNullOrEmpty(teacherName))
+            if (string.IsNullOrEmpty(name))
             {
                 return NotFound(new ErrorResponse { Error = "Teacher not found" });
             }
 
             var commentId = await _ratingService.CreateCommentAsync(
-                userId, teacherName, teacherName, request.Content, request.Anonymous);
+                userId, name, request.Content, request.Anonymous);
 
             _logger.LogInformation("User {UserId} created comment {CommentId} for teacher {TeacherId}",
-                userId, commentId, teacherName);
+                userId, commentId, name);
 
             return Ok(new ApiResponse<CommentResponse>
             {
@@ -115,22 +65,22 @@ public class TeacherRatingController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating comment for teacher {TeacherId}", teacherName);
+            _logger.LogError(ex, "Error creating comment for teacher {TeacherId}", name);
             return StatusCode(500, new ErrorResponse { Error = "Internal server error" });
         }
     }
 
-    [HttpGet("{teacherId}/comments")]
-    public async Task<IActionResult> GetComments(string teacherName, [FromQuery] int page = 1, [FromQuery] int limit = 20)
+    [HttpGet("/api/teachers/by-name/comments")]
+    public async Task<IActionResult> GetComments(string name, [FromQuery] int page = 1, [FromQuery] int limit = 20)
     {
         try
         {
-            var result = await _ratingService.GetTeacherCommentsAsync(teacherName, page, limit);
+            var result = await _ratingService.GetTeacherCommentsAsync(name, page, limit);
             return Ok(new ApiResponse<CommentsPageResponse> { Data = result });
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error getting comments for teacher {TeacherId}", teacherName);
+            _logger.LogError(ex, "Error getting comments for teacher {TeacherId}", name);
             return StatusCode(500, new ErrorResponse { Error = "Internal server error" });
         }
     }

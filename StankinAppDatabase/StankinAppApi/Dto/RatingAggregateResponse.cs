@@ -4,8 +4,8 @@ namespace StankinAppApi.Dto;
 
 public class RatingAggregateResponse
 {
-    [JsonPropertyName("teacherId")]
-    public int TeacherId { get; set; }
+    [JsonPropertyName("teacherName")]
+    public string TeacherName { get; set; } 
 
     [JsonPropertyName("averageScore")]
     public double AverageScore { get; set; }

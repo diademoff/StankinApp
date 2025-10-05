@@ -46,10 +46,13 @@ export function teacherDiscussionApp(api: ApiClient) {
                 }
 
                 // Теперь загружаем данные из PostgreSQL
-                const [ratings, commentsPage] = await Promise.all([
+                const [ratingsResponse, commentsResponse] = await Promise.all([
                     api.getTeacherRatingsByName(this.teacherName),
                     api.getTeacherCommentsByName(this.teacherName)
                 ]);
+
+                const ratings = ratingsResponse.data;
+                const commentsPage = commentsResponse.data;
 
                 this.teacher = {
                     name: this.teacherName,

@@ -240,7 +240,7 @@
                       <span class="text-yellow-500 mr-1">⭐</span>
                       <span class="font-bold" x-text="getTeacherRating(selectedLessonForModal?.teacher).avg"></span>
                       <span class="text-gray-500 text-sm ml-2"
-                        x-text="`(${getTeacherRating(selectedLessonForModal?.teacher).count} оценок)`"></span>
+                        x-text="`(${getTeacherRating(selectedLessonForModal?.teacher).count || 0} оценок)`"></span>
                     </div>
                   </div>
 
@@ -259,7 +259,7 @@
                     </div>
                   </div>
 
-                  <a :href="`teacher-discussion.html?teacherId=${getTeacherId(selectedLessonForModal?.teacher)}`"
+                  <a :href="`teacher-discussion.html?teacherName=${encodeURIComponent(selectedLessonForModal?.teacher)}`"
                     class="block w-full text-center bg-blue-500 text-white font-bold py-3 px-4 rounded-xl hover:bg-blue-600 transition-all duration-150 active:scale-95">
                     Перейти к обсуждению
                   </a>

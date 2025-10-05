@@ -24,41 +24,77 @@ public class RatingService : IRatingService
 
     private IDbConnection CreateConnection() => new NpgsqlConnection(_connectionString);
 
-    public async Task<User> GetOrCreateUserAsync(long yandexId, string username, string firstName, string email, string photoUrl)
+    private async Task<int> GetOrCreateTeacherIdAsync(string teacherName)
     {
         using var connection = CreateConnection();
-        var existingUser = await connection.QueryFirstOrDefaultAsync<User>(
-            @"SELECT * FROM ""Users"" WHERE ""YandexId"" = @YandexId",
-            new { YandexId = yandexId }
-        );
-
-        if (existingUser != null)
+        try
         {
-            await connection.ExecuteAsync(
-                @"UPDATE ""Users""
+            var id = await connection.QueryFirstOrDefaultAsync<int>(
+                @"SELECT ""Id"" FROM Teachers WHERE ""Name"" = @Name",
+                new { Name = teacherName }
+            );
+
+            if (id == 0)
+            {
+                id = await connection.QuerySingleAsync<int>(
+                    @"INSERT INTO Teachers (""Name"") VALUES (@Name) RETURNING ""Id""",
+                    new { Name = teacherName }
+                );
+                _logger.LogInformation("Created new teacher in PostgreSQL: {TeacherName} with ID {Id}", teacherName, id);
+            }
+            return id;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting/creating TeacherId for {TeacherName}", teacherName);
+            throw new InvalidOperationException("Failed to get/create teacher ID", ex);
+        }
+    }
+
+    public async Task<User> GetOrCreateUserAsync(long yandexId, string username, string firstName, string email, string photoUrl)
+    {
+        try
+        {
+            using var connection = CreateConnection();
+            var existingUser = await connection.QueryFirstOrDefaultAsync<User>(
+                @"SELECT * FROM ""Users"" WHERE ""YandexId"" = @YandexId",
+                new { YandexId = yandexId }
+            );
+
+            if (existingUser != null)
+            {
+                await connection.ExecuteAsync(
+                    @"UPDATE ""Users""
                   SET ""FirstName"" = @FirstName,
                       ""Username"" = @Username,
                       ""PhotoUrl"" = @PhotoUrl
                   WHERE ""Id"" = @Id",
-                new { existingUser.Id, FirstName = firstName, Username = username, PhotoUrl = photoUrl }
-            );
-            existingUser.FirstName = firstName;
-            existingUser.Username = username;
-            existingUser.PhotoUrl = photoUrl;
-            return existingUser;
-        }
+                    new { existingUser.Id, FirstName = firstName, Username = username, PhotoUrl = photoUrl }
+                );
+                existingUser.FirstName = firstName;
+                existingUser.Username = username;
+                existingUser.PhotoUrl = photoUrl;
+                return existingUser;
+            }
 
-        var newUserId = await connection.QuerySingleAsync<int>(
-            @"INSERT INTO ""Users"" (""YandexId"", ""FirstName"", ""Username"", ""PhotoUrl"")
+            var newUserId = await connection.QuerySingleAsync<int>(
+                @"INSERT INTO ""Users"" (""YandexId"", ""FirstName"", ""Username"", ""PhotoUrl"")
               VALUES (@YandexId, @FirstName, @Username, @PhotoUrl)
               RETURNING ""Id""",
-            new { YandexId = yandexId, FirstName = firstName, Username = username, PhotoUrl = photoUrl }
-        );
+                new { YandexId = yandexId, FirstName = firstName, Username = username, PhotoUrl = photoUrl }
+            );
 
-        return await connection.QuerySingleAsync<User>(
-            @"SELECT * FROM ""Users"" WHERE ""Id"" = @Id",
-            new { Id = newUserId }
-        );
+            return await connection.QuerySingleAsync<User>(
+                @"SELECT * FROM ""Users"" WHERE ""Id"" = @Id",
+                new { Id = newUserId }
+            );
+        }
+        catch (System.Exception ex)
+        {
+            _logger.LogError(ex, "Error getting/creating user for YandexId {YandexId}", yandexId);
+            throw;
+        }
+
     }
 
     public async Task<User> GetUserByIdAsync(int userId)
@@ -75,72 +111,94 @@ public class RatingService : IRatingService
         if (score < 1 || score > 10)
             throw new ArgumentException("Score must be between 1 and 10");
 
-        using var connection = CreateConnection();
-        var existing = await connection.QueryFirstOrDefaultAsync<Rating>(
-            @"SELECT * FROM ""Ratings"" WHERE ""UserId"" = @UserId AND ""TeacherName"" = @TeacherName",
-            new { UserId = userId, TeacherName = teacherName }
-        );
+        var teacherId = await GetOrCreateTeacherIdAsync(teacherName);  // Новый вызов
 
-        if (existing != null)
+        using var connection = CreateConnection();
+        try
         {
-            await connection.ExecuteAsync(
-                @"UPDATE ""Ratings"" SET ""Score"" = @Score WHERE ""Id"" = @Id",
-                new { Id = existing.Id, Score = score }
+            var existing = await connection.QueryFirstOrDefaultAsync<Rating>(
+                @"SELECT * FROM ""Ratings"" WHERE ""UserId"" = @UserId AND ""TeacherId"" = @TeacherId",
+                new { UserId = userId, TeacherId = teacherId }
             );
+
+            if (existing != null)
+            {
+                await connection.ExecuteAsync(
+                    @"UPDATE ""Ratings"" SET ""Score"" = @Score WHERE ""Id"" = @Id",
+                    new { Id = existing.Id, Score = score }
+                );
+                _logger.LogInformation("Updated rating for user {UserId}, teacher {TeacherName}: {Score}", userId, teacherName, score);
+            }
+            else
+            {
+                await connection.ExecuteAsync(
+                    @"INSERT INTO ""Ratings"" (""UserId"", ""TeacherId"", ""TeacherName"", ""Score"")
+                      VALUES (@UserId, @TeacherId, @TeacherName, @Score)",
+                    new { UserId = userId, TeacherId = teacherId, TeacherName = teacherName, Score = score }
+                );
+                _logger.LogInformation("Created rating for user {UserId}, teacher {TeacherName}: {Score}", userId, teacherName, score);
+            }
+            return new RatingResponse { TeacherId = teacherName, Score = score };  // Изменил на TeacherId как string (name)
         }
-        else
+        catch (Exception ex)
         {
-            await connection.ExecuteAsync(
-                @"INSERT INTO ""Ratings"" (""UserId"", ""TeacherName"", ""Score"") VALUES (@UserId, @TeacherName, @Score)",
-                new { UserId = userId, TeacherName = teacherName, Score = score }
-            );
+            _logger.LogError(ex, "Error creating/updating rating for user {UserId}, teacher {TeacherName}", userId, teacherName);
+            throw;
         }
-        return new RatingResponse { Score = score }; // Убираем TeacherId
     }
 
     public async Task<RatingAggregateResponse> GetTeacherRatingsAsync(string teacherName)
     {
+        var teacherId = await GetOrCreateTeacherIdAsync(teacherName);  // Новый вызов
+
         using var connection = CreateConnection();
-        var result = await connection.QueryFirstOrDefaultAsync<dynamic>(
-            @"SELECT COUNT(*) as count, AVG(CAST(""Score"" AS DECIMAL)) as average FROM ""Ratings"" WHERE ""TeacherName"" = @TeacherName",
-            new { TeacherName = teacherName }
-        );
-        return new RatingAggregateResponse
+        try
         {
-            AverageScore = result?.average ?? 0.0,
-            RatingsCount = (int)(result?.count ?? 0)
-        };
+            var result = await connection.QueryFirstOrDefaultAsync<dynamic>(
+                @"SELECT COUNT(*) as count, AVG(CAST(""Score"" AS DECIMAL)) as average
+                  FROM ""Ratings"" WHERE ""TeacherId"" = @TeacherId",
+                new { TeacherId = teacherId }
+            );
+            var response = new RatingAggregateResponse
+            {
+                TeacherName = teacherName,
+                AverageScore = result?.average ?? 0.0,
+                RatingsCount = (int)(result?.count ?? 0)
+            };
+            _logger.LogInformation("Fetched ratings for teacher {TeacherName}: avg {Avg}, count {Count}", teacherName, response.AverageScore, response.RatingsCount);
+            return response;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting ratings for teacher {TeacherName}", teacherName);
+            throw;
+        }
     }
 
-    public async Task<int> CreateCommentAsync(int userId, string teacherId, string teacherName, string content, bool anonymous)
+    public async Task<int> CreateCommentAsync(int userId, string teacherName, string content, bool anonymous)
     {
-        if (string.IsNullOrWhiteSpace(content))
-        {
-            throw new ArgumentException("Comment content cannot be empty");
-        }
+        if (string.IsNullOrWhiteSpace(content)) throw new ArgumentException("Comment content cannot be empty");
+        if (content.Length > 5000) throw new ArgumentException("Comment content cannot exceed 5000 characters");
 
-        if (content.Length > 5000)
-        {
-            throw new ArgumentException("Comment content cannot exceed 5000 characters");
-        }
+        var teacherId = await GetOrCreateTeacherIdAsync(teacherName);  // Новый вызов
 
         using var connection = CreateConnection();
-
-        var commentId = await connection.QuerySingleAsync<int>(
-            @"INSERT INTO ""Comments"" (""UserId"", ""TeacherId"", ""TeacherName"", ""Content"", ""Anonymous"")
-              VALUES (@UserId, @TeacherId, @TeacherName, @Content, @Anonymous)
-              RETURNING ""Id""",
-            new
-            {
-                UserId = userId,
-                TeacherId = teacherId,
-                TeacherName = teacherName,
-                Content = content,
-                Anonymous = anonymous
-            }
-        );
-
-        return commentId;
+        try
+        {
+            var commentId = await connection.QuerySingleAsync<int>(
+                @"INSERT INTO ""Comments"" (""UserId"", ""TeacherId"", ""TeacherName"", ""Content"", ""Anonymous"")
+                  VALUES (@UserId, @TeacherId, @TeacherName, @Content, @Anonymous)
+                  RETURNING ""Id""",
+                new { UserId = userId, TeacherId = teacherId, TeacherName = teacherName, Content = content, Anonymous = anonymous }
+            );
+            _logger.LogInformation("Created comment {CommentId} for user {UserId}, teacher {TeacherName}", commentId, userId, teacherName);
+            return commentId;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error creating comment for user {UserId}, teacher {TeacherName}", userId, teacherName);
+            throw;
+        }
     }
 
     public async Task<CommentsPageResponse> GetTeacherCommentsAsync(string teacherName, int page, int limit)
@@ -148,19 +206,23 @@ public class RatingService : IRatingService
         if (page < 1) page = 1;
         if (limit < 1 || limit > 100) limit = 20;
 
-        using var connection = CreateConnection();
+        var teacherId = await GetOrCreateTeacherIdAsync(teacherName);  // Новый вызов
 
-        // Get total count
-        var total = await connection.QuerySingleAsync<int>(
-            @"SELECT COUNT(*) FROM ""Comments""
+        try
+        {
+            using var connection = CreateConnection();
+
+            // Get total count
+            var total = await connection.QuerySingleAsync<int>(
+                @"SELECT COUNT(*) FROM ""Comments""
               WHERE ""TeacherName"" = @TeacherName AND ""IsDeleted"" = false",
-            new { TeacherName = teacherName }
-        );
+                new { TeacherName = teacherName }
+            );
 
-        // Get paginated comments with votes
-        var offset = (page - 1) * limit;
-        var comments = await connection.QueryAsync<dynamic>(
-            @"SELECT
+            // Get paginated comments with votes
+            var offset = (page - 1) * limit;
+            var comments = await connection.QueryAsync<dynamic>(
+                @"SELECT
                 c.""Id"",
                 c.""UserId"",
                 c.""Content"",
@@ -178,36 +240,42 @@ public class RatingService : IRatingService
                        u.""FirstName"", u.""Username"", u.""PhotoUrl""
               ORDER BY c.""CreatedAt"" DESC
               LIMIT @Limit OFFSET @Offset",
-            new { TeacherName = teacherName, Limit = limit, Offset = offset }
-        );
+                new { TeacherName = teacherName, Limit = limit, Offset = offset }
+            );
 
-        var commentDtos = new List<CommentDto>();
-        foreach (var comment in comments)
-        {
-            commentDtos.Add(new CommentDto
+            var commentDtos = new List<CommentDto>();
+            foreach (var comment in comments)
             {
-                Id = comment.Id,
-                User = comment.Anonymous ? null : new UserDto
+                commentDtos.Add(new CommentDto
                 {
-                    Id = comment.UserId,
-                    FirstName = comment.FirstName,
-                    Username = comment.Username,
-                    PhotoUrl = comment.PhotoUrl
-                },
-                Anonymous = comment.Anonymous,
-                Content = comment.Content,
-                CreatedAt = comment.CreatedAt,
-                Votes = (int)comment.VotesSum
-            });
-        }
+                    Id = comment.Id,
+                    User = comment.Anonymous ? null : new UserDto
+                    {
+                        Id = comment.UserId,
+                        FirstName = comment.FirstName,
+                        Username = comment.Username,
+                        PhotoUrl = comment.PhotoUrl
+                    },
+                    Anonymous = comment.Anonymous,
+                    Content = comment.Content,
+                    CreatedAt = comment.CreatedAt,
+                    Votes = (int)comment.VotesSum
+                });
+            }
 
-        return new CommentsPageResponse
+            return new CommentsPageResponse
+            {
+                Total = total,
+                Page = page,
+                Limit = limit,
+                Comments = commentDtos
+            };
+        }
+        catch (System.Exception ex)
         {
-            Total = total,
-            Page = page,
-            Limit = limit,
-            Comments = commentDtos
-        };
+            _logger.LogError(ex, "Error getting comments for teacher {TeacherName}", teacherName);
+            throw;
+        }
     }
 
     public async Task<VoteResponse> VoteForCommentAsync(int userId, int commentId, int vote)

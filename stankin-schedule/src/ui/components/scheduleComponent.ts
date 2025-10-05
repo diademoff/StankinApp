@@ -18,23 +18,6 @@ interface RatingData {
   topComments: TopComment[];
 }
 
-// TODO: ЗАГЛУШКА: Данные по рейтингам, которые в будущем придут с API
-const MOCK_RATINGS_DATA: Record<string, RatingData> = {
-  'Иванов И.И.': {
-    id: 1, avg: 4.8, count: 125, topComments: [
-      { id: 101, content: 'Лучший преподаватель по Web-приложениям!', votes: 42 },
-      { id: 102, content: 'Материал сложный, но лекции интересные.', votes: 15 },
-    ]
-  },
-  'Аристархов П.В.': {
-    id: 2, avg: 4.5, count: 98, topComments: [
-      { id: 201, content: 'Хорошо объясняет физику, наглядно и с примерами.', votes: 25 },
-    ]
-  },
-  'Не указан': { id: 0, avg: '-', count: 0, topComments: [] }
-};
-
-
 export function scheduleComponent(
   groupName: string,
   loadScheduleUseCase: LoadScheduleWeekUseCase
@@ -362,18 +345,27 @@ export function scheduleComponent(
     },
 
     getTeacherRating(teacherName: string) {
-      return MOCK_RATINGS_DATA[teacherName] || { avg: 'N/A', count: 0 };
+      return fetch(`/api/teachers/${encodeURIComponent(teacherName)}/ratings`)
+        .then(res => res.json())
+        .then(data => ({ avg: data.averageScore || 'N/A', count: data.ratingsCount || 0 }))
+        .catch(err => {
+          console.error('Error fetching rating:', err);
+          return { avg: 'N/A', count: 0 };
+        });
     },
 
     getTopComments(teacherName: string) {
-      if (!teacherName || !MOCK_RATINGS_DATA[teacherName]) {
-        return [];
-      }
-      return MOCK_RATINGS_DATA[teacherName].topComments.slice(0, 3);
-    },
-
-    getTeacherId(teacherName: string) {
-      return MOCK_RATINGS_DATA[teacherName]?.id || 0;
-    },
+      return fetch(`/api/teachers/${encodeURIComponent(teacherName)}/comments?page=1&limit=3`)
+        .then(res => res.json())
+        .then(data => data.comments.map((c: { id: number; content: string; votes: number; }) => ({
+          id: c.id as number,
+          content: c.content as string,
+          votes: c.votes as number
+        })) || [])
+        .catch(err => {
+          console.error('Error fetching comments:', err);
+          return [];
+        });
+    }
   };
 }

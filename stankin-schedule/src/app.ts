@@ -43,8 +43,4 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('teacherDiscussionApp', () => teacherDiscussionApp(api)); // Передаем ApiClient
 });
 
-// @ts-ignore
-window.Alpine = Alpine;
-Alpine.start();
-
 console.log('Schedule application initialized');
