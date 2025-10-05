@@ -1,6 +1,20 @@
 export class ApiClient {
   constructor(private base: string) { }
 
+  private baseUrl: string = '/api';
+
+  private getHeaders(): Record<string, string> {
+    const token = localStorage.getItem('jwt_token');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      console.log('ApiClient: Added JWT to headers'); // Logger: info
+    }
+    return headers;
+  }
+
   private getAuthHeaders(): Record<string, string> {
     const token = localStorage.getItem('jwt_token');
     if (token) {
@@ -116,12 +130,18 @@ export class ApiClient {
   }
 
   async postRatingByName(teacherName: string, score: number): Promise<any> {
-    const url = `${this.base}/api/teachers/by-name/ratings`;
-    return this.fetchJson(url, {
+    const response = await fetch(`${this.baseUrl}/teachers/${encodeURIComponent(teacherName)}/ratings`, {
       method: 'POST',
-      headers: this.getAuthHeaders(),
-      body: JSON.stringify({ teacherName, score }),
+      headers: this.getHeaders(),
+      body: JSON.stringify({ score })
     });
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('ApiClient: postRating failed', error); // Logger: error
+      throw new Error(error.message || 'Failed to post rating');
+    }
+    console.log('ApiClient: postRating successful'); // Validation: success
+    return response.json();
   }
 
   async postCommentByName(teacherName: string, content: string, anonymous: boolean): Promise<any> {

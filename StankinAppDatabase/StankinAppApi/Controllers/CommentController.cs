@@ -37,20 +37,16 @@ public class CommentController : ControllerBase
                 return BadRequest(new ErrorResponse { Error = "Vote must be -1 or 1" });
             }
 
-            var result = await _ratingService.VoteForCommentAsync(userId, commentId, request.Vote);
-
-            _logger.LogInformation("User {UserId} voted {Vote} for comment {CommentId}",
-                userId, request.Vote, commentId);
-
-            return Ok(new ApiResponse<VoteResponse> { Data = result });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new ErrorResponse { Error = ex.Message });
+            var response = await _ratingService.VoteForCommentAsync(userId, commentId, request.Vote);
+            return Ok(response);
         }
         catch (ArgumentException ex)
         {
-            return NotFound(new ErrorResponse { Error = ex.Message });
+            return BadRequest(new ErrorResponse { Error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new ErrorResponse { Error = ex.Message });
         }
         catch (Exception ex)
         {

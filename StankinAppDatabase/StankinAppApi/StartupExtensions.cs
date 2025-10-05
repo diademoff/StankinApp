@@ -91,6 +91,10 @@ static class StartupExtensions
         // Add memory cache
         builder.Services.AddMemoryCache();
 
+        builder.Services.AddHttpClient(); // Для HttpClientFactory
+        builder.Services.AddSingleton<IAuthService, AuthService>();
+        builder.Services.AddSingleton<IRatingService, RatingService>();
+
         // Configure Authentication
         builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             .AddJwtBearer(options =>
@@ -108,6 +112,9 @@ static class StartupExtensions
                         Encoding.UTF8.GetBytes(jwtConfig["Secret"]!))
                 };
             });
+
+        // Add Authorization
+        builder.Services.AddAuthorization();
 
         // Read database path from configuration (appsettings.json or appsettings.Development.json)
         var dbPath = configuration.GetValue<string>("Database:Path");

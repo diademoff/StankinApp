@@ -1,5 +1,6 @@
 import { ApiClient } from '../../infra/api/ApiClient';
 import { AuthWithYandexUseCase } from '../../core/use-cases/AuthWithYandexUseCase';
+import { HttpAuthRepository } from '../../infra/repositories/HttpAuthRepository';
 
 export function teacherDiscussionApp(api: ApiClient) {
     return {
@@ -70,26 +71,32 @@ export function teacherDiscussionApp(api: ApiClient) {
         async login() {
             console.log('teacherDiscussionApp: Starting Yandex auth'); // Logger: info
             try {
+                const authRepository = new HttpAuthRepository(api); // api - экземпляр ApiClient
+                const authUseCase = new AuthWithYandexUseCase(authRepository);
+
                 const initResult = await window.YaAuthSuggest.init({
                     client_id: 'b8cf30c02ab34703a93e776050c904f7',
                     response_type: 'token',
                     redirect_uri: `${window.location.origin}/auth-callback.html`
                 }, window.location.origin, {
-                    view: 'default' // Или 'button', если нужно рендерить кнопку; без view для handler
+                    view: 'default' // Или 'button', если нужно рендерить кнопку
                 });
 
                 if (!initResult) {
-                    throw new Error('Yandex SDK init failed');
+                    throw new Error('Yandex SDK init failed'); // Validation: fail
                 }
                 console.log('teacherDiscussionApp: SDK initialized successfully'); // Validation: success
 
                 const authData = await initResult.handler();
                 if (!authData || !authData.access_token) {
-                    throw new Error('No access_token received from Yandex');
+                    throw new Error('No access_token received from Yandex'); // Validation: fail
                 }
                 console.log('teacherDiscussionApp: Yandex token received'); // Validation: success
 
                 const jwt = await authUseCase.execute(authData.access_token);
+                if (!jwt) {
+                    throw new Error('Failed to get JWT from backend'); // Validation: fail
+                }
                 localStorage.setItem('jwt_token', jwt);
                 this.user.loggedIn = true;
                 console.log('teacherDiscussionApp: JWT saved, user logged in'); // Validation: success

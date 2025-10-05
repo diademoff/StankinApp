@@ -1,16 +1,9 @@
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
 using Microsoft.IdentityModel.Tokens;
 using StankinAppApi.Dto;
 using StankinAppApi.Models;
-using System;
-using System.Collections.Generic;
 using System.IdentityModel.Tokens.Jwt;
-using System.Net.Http;
-using System.Net.Http.Json;
 using System.Security.Claims;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace StankinAppApi.Services;
 
@@ -40,6 +33,7 @@ public class AuthService : IAuthService
         _yandexClientSecret = configuration["Yandex:ClientSecret"] ?? throw new InvalidOperationException("Yandex:ClientSecret not configured");
     }
 
+    // Для code flow
     public async Task<(string Jwt, User User)> AuthenticateYandexUserAsync(string code)
     {
         try
@@ -62,19 +56,54 @@ public class AuthService : IAuthService
             var user = await _ratingService.GetOrCreateUserAsync(
                 yandexId,
                 userInfo.Login,
-                userInfo.FirstName,
-                "",
+                userInfo.FirstName ?? userInfo.RealName,
+                userInfo.DefaultEmail,
                 !userInfo.IsAvatarEmpty ? $"https://avatars.yandex.net/get-yapic/{userInfo.DefaultAvatarId}/islands-200" : null
             );
 
             // 4. Сгенерировать наш JWT
             var jwt = GenerateJwtToken(user.Id, user.YandexId);
 
+            _logger.LogInformation("Yandex code flow authentication successful for user {UserId}", user.Id);
             return (jwt, user);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error during Yandex authentication process.");
+            _logger.LogError(ex, "Error during Yandex code flow authentication process.");
+            throw;
+        }
+    }
+
+    // Новый метод для implicit flow: напрямую с access_token
+    public async Task<(string Jwt, User User)> AuthenticateWithYandexTokenAsync(string accessToken)
+    {
+        try
+        {
+            // Получить информацию о пользователе напрямую с access_token
+            var userInfo = await GetYandexUserInfoAsync(accessToken);
+            if (userInfo == null || !long.TryParse(userInfo.Id, out var yandexId))
+            {
+                throw new InvalidOperationException("Failed to get Yandex user info.");
+            }
+
+            // Найти или создать пользователя
+            var user = await _ratingService.GetOrCreateUserAsync(
+                yandexId,
+                userInfo.Login,
+                userInfo.FirstName ?? userInfo.RealName,
+                userInfo.DefaultEmail,
+                !userInfo.IsAvatarEmpty ? $"https://avatars.yandex.net/get-yapic/{userInfo.DefaultAvatarId}/islands-200" : null
+            );
+
+            // Сгенерировать JWT
+            var jwt = GenerateJwtToken(user.Id, user.YandexId);
+
+            _logger.LogInformation("Yandex implicit flow authentication successful for user {UserId}", user.Id);
+            return (jwt, user);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during Yandex implicit flow authentication process.");
             throw;
         }
     }
@@ -98,7 +127,12 @@ public class AuthService : IAuthService
             return null;
         }
 
-        return await response.Content.ReadFromJsonAsync<YandexTokenResponse>();
+        var tokenResponse = await response.Content.ReadFromJsonAsync<YandexTokenResponse>();
+        if (tokenResponse != null)
+        {
+            _logger.LogInformation("Yandex token obtained successfully");
+        }
+        return tokenResponse;
     }
 
     private async Task<YandexUserResponse> GetYandexUserInfoAsync(string accessToken)
@@ -114,10 +148,14 @@ public class AuthService : IAuthService
             return null;
         }
 
-        return await response.Content.ReadFromJsonAsync<YandexUserResponse>();
+        var userResponse = await response.Content.ReadFromJsonAsync<YandexUserResponse>();
+        if (userResponse != null)
+        {
+            _logger.LogInformation("Yandex user info obtained successfully for user {YandexId}", userResponse.Id);
+        }
+        return userResponse;
     }
 
-    // Этот метод был немного изменен для YandexId
     public string GenerateJwtToken(int userId, long yandexId)
     {
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSecret));
@@ -140,10 +178,11 @@ public class AuthService : IAuthService
             expires: DateTime.UtcNow.AddDays(30),
             signingCredentials: credentials
         );
-        return new JwtSecurityTokenHandler().WriteToken(token);
+        var jwt = new JwtSecurityTokenHandler().WriteToken(token);
+        _logger.LogInformation("Generated JWT for user {UserId}", userId);
+        return jwt;
     }
 
-    // Этот метод не изменился
     public ClaimsPrincipal ValidateToken(string token)
     {
         try
@@ -163,6 +202,7 @@ public class AuthService : IAuthService
                 ClockSkew = TimeSpan.Zero
             };
             var principal = tokenHandler.ValidateToken(token, validationParameters, out var validatedToken);
+            _logger.LogInformation("Token validated successfully");
             return principal;
         }
         catch (Exception ex)
