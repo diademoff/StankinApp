@@ -35,6 +35,14 @@ export class ApiClient {
     }
   }
 
+  async postYandexToken(access_token: string): Promise<{ jwt: string }> {
+    const url = `${this.base}/api/auth/yandex/token`;
+    return this.fetchJson(url, {
+      method: 'POST',
+      body: JSON.stringify({ access_token }),
+    });
+  }
+
   async getGroups(): Promise<string[]> {
     const url = `${this.base}/api/groups`;
     return this.fetchJson(url);
