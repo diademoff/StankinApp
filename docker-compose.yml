@@ -10,6 +10,7 @@ services:
       - Database__Path=/app/data/schedule.db  # Путь к БД внутри контейнера (override, если нужно)
     volumes:
       - ./deploy/data:/app/data  # Bind-mount для persistent БД (на хосте: ./db-data/schedule.db)
+      - ~/.microsoft/usersecrets:/root/.microsoft/usersecrets:ro
     restart: unless-stopped
 
   web:
