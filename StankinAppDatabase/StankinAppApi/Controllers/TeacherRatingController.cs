@@ -26,15 +26,16 @@ public class TeacherRatingController : ControllerBase
         _logger = logger;
     }
 
-    [HttpPost("by-name/comments")]
+    [HttpPost("comment")]
     [Authorize]
-    public async Task<IActionResult> CreateComment(string name, [FromBody] CreateCommentRequest request)
+    public async Task<IActionResult> CreateComment([FromBody] CreateCommentRequest request)
     {
         try
         {
             var userIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (userIdStr == null) return Unauthorized();
             var userId = int.Parse(userIdStr);
+            string name = request.TeacherName;
 
             // Validate content
             if (string.IsNullOrWhiteSpace(request.Content))
@@ -65,12 +66,12 @@ public class TeacherRatingController : ControllerBase
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error creating comment for teacher {TeacherId}", name);
+            _logger.LogError(ex, "Error creating comment for teacher {TeacherId}", request.TeacherName);
             return StatusCode(500, new ErrorResponse { Error = "Internal server error" });
         }
     }
 
-    [HttpGet("by-name/comments")]
+    [HttpGet("get-comments")]
     public async Task<IActionResult> GetComments(string name, [FromQuery] int page = 1, [FromQuery] int limit = 20)
     {
         try
@@ -86,7 +87,7 @@ public class TeacherRatingController : ControllerBase
     }
 
 
-    [HttpPost("by-name/ratings")]
+    [HttpPost("vote-rating")]
     [Authorize]
     public async Task<IActionResult> CreateRatingByName([FromBody] CreateRatingRequest request)
     {
@@ -118,7 +119,7 @@ public class TeacherRatingController : ControllerBase
         }
     }
 
-    [HttpGet("by-name/ratings")]
+    [HttpGet("get-teacher-rating")]
     public async Task<IActionResult> GetRatingsByName([FromQuery] string name)
     {
         try
@@ -136,9 +137,9 @@ public class TeacherRatingController : ControllerBase
         }
     }
 
-    [HttpGet("by-name/user-rating")]
+    [HttpGet("get-user-rating")]
     [Authorize]
-    public async Task<IActionResult> GetUserRatingForTeacher(string name)
+    public async Task<IActionResult> GetUserRatingForTeacher([FromQuery] string name)
     {
         try
         {

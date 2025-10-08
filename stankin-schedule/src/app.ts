@@ -29,7 +29,7 @@ document.addEventListener('alpine:init', () => {
   Alpine.data('scheduleApp', () => scheduleApp(loadGroupsUseCase, loadScheduleUseCase));
   // @ts-ignore
   Alpine.data('scheduleComponent', (groupName: string) =>
-    scheduleComponent(groupName, loadScheduleUseCase)
+    scheduleComponent(groupName, loadScheduleUseCase, api)
   );
   // @ts-ignore
   Alpine.data('teacherDiscussionApp', () => teacherDiscussionApp(api, authUseCase));

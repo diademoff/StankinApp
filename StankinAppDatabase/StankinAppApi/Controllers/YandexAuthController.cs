@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using StankinAppApi.Services;
 using StankinAppApi.Dto;
-using Serilog;
+using System.Text.Json.Serialization;
 
 namespace StankinAppApi.Controllers;
 
@@ -100,5 +100,6 @@ public class YandexAuthController : ControllerBase
 }
 public class YandexTokenRequest
 {
+    [JsonPropertyName("access_token")]
     public string AccessToken { get; set; }
 }

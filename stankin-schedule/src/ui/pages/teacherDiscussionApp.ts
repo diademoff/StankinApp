@@ -1,26 +1,27 @@
 import { ApiClient } from '../../infra/api/ApiClient';
 import { AuthWithYandexUseCase } from '../../core/use-cases/AuthWithYandexUseCase';
-import { HttpAuthRepository } from '../../infra/repositories/HttpAuthRepository';
+import { authService } from '../../shared/AuthService';
 
-export function teacherDiscussionApp(api: ApiClient) {
+// To avoid TypeScript errors for Yandex SDK
+declare global {
+    interface Window {
+        YaAuthSuggest: any;
+    }
+}
+
+export function teacherDiscussionApp(api: ApiClient, authUseCase: AuthWithYandexUseCase) {
     return {
         teacherName: null as string | null,
         teacher: null as any | null,
-        comments: [] as any[],
         loading: true,
         error: null as string | null,
         user: {
             loggedIn: false,
-            ownRating: 0, // Тут можно будет хранить оценку пользователя
-        },
-        newCommentText: '',
-
-        get sortedComments() {
-            return this.comments.slice().sort((a, b) => b.votes - a.votes);
+            ownRating: 0,
         },
 
         async init() {
-            this.user.loggedIn = !!localStorage.getItem('jwt_token');
+            this.user.loggedIn = authService.isLoggedIn();
             const params = new URLSearchParams(window.location.search);
             const teacherNameParam = params.get('teacherName');
 
@@ -33,7 +34,6 @@ export function teacherDiscussionApp(api: ApiClient) {
             this.teacherName = decodeURIComponent(teacherNameParam);
             await this.fetchData();
 
-            // Если пользователь авторизован, загружаем его оценку
             if (this.user.loggedIn) {
                 await this.fetchUserRating();
             }
@@ -41,36 +41,25 @@ export function teacherDiscussionApp(api: ApiClient) {
 
         async fetchData() {
             if (!this.teacherName) return;
-
             this.loading = true;
             this.error = null;
 
             try {
-                const [ratingsResponse, commentsResponse] = await Promise.all([
-                    api.getTeacherRatingsByName(this.teacherName),
-                    api.getTeacherCommentsByName(this.teacherName)
-                ]);
-
-                // Валидация: проверяем структуру ответа
-                if (!ratingsResponse.data || !commentsResponse.data) {
-                    throw new Error("Некорректный ответ от сервера");
+                const ratingsResponse = await api.getTeacherRating(this.teacherName);
+                if (!ratingsResponse.data) {
+                    throw new Error("Некорректный ответ от сервера при загрузке рейтинга");
                 }
 
                 const ratings = ratingsResponse.data;
-                const commentsPage = commentsResponse.data;
 
                 this.teacher = {
                     name: this.teacherName,
-                    averageRating: ratings.averageScore || 0,
+                    averageRating: ratings.averageScore?.toFixed(1) || '–',
                     totalRatings: ratings.ratingsCount || 0
                 };
 
-                this.comments = commentsPage.comments || [];
-
-                console.log('✅ Данные преподавателя загружены'); // Validation: success
-
             } catch (e: any) {
-                console.error('❌ Ошибка загрузки данных:', e); // Logger: error
+                console.error('❌ Ошибка загрузки данных:', e);
                 this.error = e.message || "Не удалось загрузить данные. Попробуйте позже.";
             } finally {
                 this.loading = false;
@@ -79,12 +68,12 @@ export function teacherDiscussionApp(api: ApiClient) {
 
         async fetchUserRating() {
             if (!this.teacherName || !this.user.loggedIn) return;
-
             try {
-                const response = await api.getUserRatingForTeacher(this.teacherName);
+                const response = await api.getUserRating(this.teacherName);
                 this.user.ownRating = response.data?.score || 0;
             } catch (e) {
-                console.warn('Не удалось загрузить оценку пользователя');
+                console.warn('Не удалось загрузить оценку пользователя. Возможно, она еще не поставлена.');
+                this.user.ownRating = 0;
             }
         },
 
@@ -93,43 +82,27 @@ export function teacherDiscussionApp(api: ApiClient) {
              * Для отладки можно перейти на https://oauth.yandex.ru/authorize?response_type=token&client_id=b8cf30c02ab34703a93e776050c904f7
              * и получить токен вручную
              */
-
-            console.log('teacherDiscussionApp: Starting Yandex auth'); // Logger: info
             try {
-                const authRepository = new HttpAuthRepository(api); // api - экземпляр ApiClient
-                const authUseCase = new AuthWithYandexUseCase(authRepository);
+                const YANDEX_CLIENT_ID = "b8cf30c02ab34703a93e776050c904f7";
+                const initResult = await window.YaAuthSuggest.init({
+                    client_id: YANDEX_CLIENT_ID,
+                    response_type: 'token',
+                    redirect_uri: `${window.location.origin}/auth-callback.html`
+                }, window.location.origin);
 
-                // const initResult = await window.YaAuthSuggest.init({
-                //     client_id: 'b8cf30c02ab34703a93e776050c904f7',
-                //     response_type: 'token',
-                //     redirect_uri: `${window.location.origin}/auth-callback.html`
-                // }, window.location.origin, {
-                //     view: 'default' // Или 'button', если нужно рендерить кнопку
-                // });
+                if (!initResult) throw new Error('Yandex SDK init failed');
 
-                // if (!initResult) {
-                //     throw new Error('Yandex SDK init failed'); // Validation: fail
-                // }
-                // console.log('teacherDiscussionApp: SDK initialized successfully'); // Validation: success
+                const authData = await initResult.handler();
+                if (!authData || !authData.access_token) throw new Error('No access_token received from Yandex');
 
-                // const authData = await initResult.handler();
-                // if (!authData || !authData.access_token) {
-                //     throw new Error('No access_token received from Yandex'); // Validation: fail
-                // }
-                // console.log('teacherDiscussionApp: Yandex token received'); // Validation: success
+                const authToken = await authUseCase.execute(authData.access_token);
+                if (!authToken) throw new Error('Failed to get auth token from backend');
 
-                // const jwt = await authUseCase.execute(authData.access_token);
-                // if (!jwt) {
-                //     throw new Error('Failed to get JWT from backend'); // Validation: fail
-                // }
-                // localStorage.setItem('jwt_token', jwt);
+                authService.setToken(authToken);
                 this.user.loggedIn = true;
 
                 await this.fetchUserRating();
-
-                console.log('teacherDiscussionApp: JWT saved, user logged in'); // Validation: success
-
-                await this.fetchData(); // Обновить данные с auth headers
+                await this.fetchData();
             } catch (error) {
                 console.error('teacherDiscussionApp: Auth failed', error); // Logger: error
                 this.error = 'Ошибка авторизации через Yandex. Попробуйте позже.';
@@ -137,70 +110,23 @@ export function teacherDiscussionApp(api: ApiClient) {
         },
 
         logout() {
-            localStorage.removeItem('jwt_token');
-            this.user.loggedIn = false;
-            // Можно перезагрузить страницу или просто обновить UI
-            window.location.reload();
+            authService.logout();
         },
 
         async rateTeacher(score: number) {
             if (!this.user.loggedIn || !this.teacherName) {
-                alert('Пожалуйста, войдите чтобы оценить преподавателя');
+                alert('Пожалуйста, войдите, чтобы оценить преподавателя.');
                 return;
             }
 
             try {
-                await api.postRatingByName(this.teacherName, score);
+                await api.postTeacherRating(this.teacherName, score);
                 this.user.ownRating = score;
-
-                // Валидация: обновляем общие данные
-                await this.fetchData();
-                console.log('✅ Rating submitted successfully'); // Validation: success
+                await this.fetchData(); // Refresh overall rating
 
             } catch (e: any) {
-                console.error('❌ Rating error:', e); // Logger: error
+                console.error('Rating error:', e);
                 alert(`Ошибка при установке оценки: ${e.message}`);
-            }
-        },
-
-        async voteComment(commentId: number, direction: 1 | -1) {
-            if (!this.user.loggedIn) {
-                alert('Пожалуйста, войдите, чтобы голосовать.');
-                return;
-            }
-
-            try {
-                await api.postVote(commentId, direction);
-
-                // Валидация: обновляем комментарии чтобы увидеть изменения
-                await this.fetchData();
-                console.log('✅ Vote submitted'); // Validation: success
-
-            } catch (e: any) {
-                console.error('❌ Voting error:', e); // Logger: error
-                alert(`Ошибка голосования: ${e.message}`);
-            }
-        },
-
-        async addComment() {
-            if (!this.user.loggedIn) {
-                alert('Пожалуйста, войдите чтобы оставить комментарий');
-                return;
-            }
-
-            if (!this.newCommentText.trim() || !this.teacherName) return;
-
-            try {
-                await api.postCommentByName(this.teacherName, this.newCommentText.trim(), false);
-                this.newCommentText = '';
-
-                // Валидация: обновляем комментарии
-                await this.fetchData();
-                console.log('✅ Comment added successfully'); // Validation: success
-
-            } catch (e: any) {
-                console.error('❌ Comment error:', e); // Logger: error
-                alert(`Не удалось отправить комментарий: ${e.message}`);
             }
         }
     }

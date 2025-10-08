@@ -164,7 +164,7 @@ public class RatingService : IRatingService
             var response = new RatingAggregateResponse
             {
                 TeacherName = teacherName,
-                AverageScore = result?.average ?? 0.0,
+                AverageScore = Convert.ToDouble(result?.average ?? 0.0),
                 RatingsCount = (int)(result?.count ?? 0)
             };
             _logger.LogInformation("Fetched ratings for teacher {TeacherName}: avg {Avg}, count {Count}", teacherName, response.AverageScore, response.RatingsCount);
@@ -205,6 +205,8 @@ public class RatingService : IRatingService
 
     public async Task<CommentsPageResponse> GetTeacherCommentsAsync(string teacherName, int page, int limit)
     {
+        //TODO: fix here
+        // Reproduce bug: /api/teachers/get-comments?name=Пушков Р.Л.&page=1&limit=20
         if (page < 1) page = 1;
         if (limit < 1 || limit > 100) limit = 20;
 
@@ -265,12 +267,17 @@ public class RatingService : IRatingService
                 });
             }
 
+            int t = total;
+            int p = page;
+            int l = limit;
+            List<CommentDto> c = commentDtos;
+
             return new CommentsPageResponse
             {
-                Total = total,
-                Page = page,
-                Limit = limit,
-                Comments = commentDtos
+                Total = t,
+                Page = p,
+                Limit = l,
+                Comments = c
             };
         }
         catch (System.Exception ex)
