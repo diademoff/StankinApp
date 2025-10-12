@@ -17,6 +17,10 @@
 	  <PackageReference Include="Serilog.AspNetCore" Version="9.0.0" />
 	  <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
 	  <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+	  <PackageReference Include="Npgsql" Version="8.0.3" />
+	  <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="7.6.3" />
+	  <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.0" />
+	  <PackageReference Include="Dapper" Version="2.1.66" />
 	</ItemGroup>
 
 	<PropertyGroup>
@@ -24,10 +28,14 @@
 		<TargetFramework>net8.0</TargetFramework>
 		<ImplicitUsings>true</ImplicitUsings>
 		<Nullable>disable</Nullable>
-	</PropertyGroup>
+	  <UserSecretsId>d8c853ec-5f4f-4514-875a-34eabc883b37</UserSecretsId>
+  </PropertyGroup>
 
 	<ItemGroup>
 		<None Update="appsettings.json">
+			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
+		</None>
+		<None Update="appsettings.Development.json">
 			<CopyToOutputDirectory>Always</CopyToOutputDirectory>
 		</None>
 	</ItemGroup>

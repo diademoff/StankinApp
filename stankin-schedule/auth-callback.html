@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, shrink-to-fit=no, viewport-fit=cover">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <style>
+    html, body { background: #eee; }
+  </style>
+  <script src="https://yastatic.net/s3/passport-sdk/autofill/v1/sdk-suggest-token-with-polyfills-latest.js"></script>
+</head>
+<body>
+  <script>
+    window.onload = function() {
+      console.log('Sending Yandex token back to origin'); // Logger: info
+      try {
+        window.YaSendSuggestToken(window.location.origin, {});
+        console.log('Token sent successfully'); // Validation: success
+      } catch (error) {
+        console.error('Error sending token:', error); // Logger: error
+      }
+    };
+  </script>
+</body>
+</html>

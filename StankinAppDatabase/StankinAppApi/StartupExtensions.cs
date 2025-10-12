@@ -4,6 +4,11 @@ using Microsoft.Extensions.Caching.Memory;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using StankinAppApi.Services;
+using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+
 namespace StankinAppApi;
 
 static class StartupExtensions
@@ -15,6 +20,7 @@ static class StartupExtensions
         "https://89.111.131.170",
         "http://89.111.131.170"
     ];
+
     public static void ConfigureLogging(this WebApplicationBuilder builder)
     {
         Log.Logger = new LoggerConfiguration()
@@ -63,6 +69,8 @@ static class StartupExtensions
 #if DEBUG
         builder.Services.AddCors(o => o.AddPolicy("AllowFrontend", p =>
             p.AllowAnyOrigin()
+                .AllowAnyHeader()
+                .AllowAnyMethod()
         ));
 #else
         builder.Services.AddCors(o => o.AddPolicy("AllowFrontend", p =>
@@ -75,28 +83,83 @@ static class StartupExtensions
 
     public static void ConfigureServices(this WebApplicationBuilder builder)
     {
+        var configuration = builder.Configuration;
+
+        // Add controllers support
+        builder.Services.AddControllers();
+
+        // Add memory cache
         builder.Services.AddMemoryCache();
 
-        var configuration = builder.Configuration; // Получаем конфигурацию
+        builder.Services.AddHttpClient(); // Для HttpClientFactory
+        builder.Services.AddSingleton<IAuthService, AuthService>();
+        builder.Services.AddSingleton<IRatingService, RatingService>();
 
-        // Читаем путь из конфигурации (fallback на дефолтный, если не задан)
-        var dbPath = configuration.GetValue<string>("Database:Path") ?? "data/schedule.db";
+        // Configure Authentication
+        builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+            .AddJwtBearer(options =>
+            {
+                var jwtConfig = builder.Configuration.GetSection("Jwt");
+                options.TokenValidationParameters = new()
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+                    ValidIssuer = jwtConfig["Issuer"],
+                    ValidAudience = jwtConfig["Audience"],
+                    IssuerSigningKey = new SymmetricSecurityKey(
+                        Encoding.UTF8.GetBytes(jwtConfig["Secret"]!))
+                };
+            });
 
-#if DEBUG
-        dbPath = "schedule.db";
-#endif
+        // Add Authorization
+        builder.Services.AddAuthorization();
 
-        // Регистрируем сервис с вычисленным полным путём
+        // Read database path from configuration (appsettings.json or appsettings.Development.json)
+        var dbPath = configuration.GetValue<string>("Database:Path");
+        if (string.IsNullOrEmpty(dbPath))
+        {
+            throw new InvalidOperationException("Database path is not configured in appsettings.");
+        }
+
+        // Make path relative to the application's root directory if it's not already an absolute path
+        var absoluteDbPath = Path.IsPathRooted(dbPath)
+            ? dbPath
+            : Path.Combine(builder.Environment.ContentRootPath, dbPath);
+
         builder.Services.AddSingleton<IDataReader>(_ =>
-            new DatabaseReader(Path.GetFullPath(dbPath)) // Path.GetFullPath обеспечит абсолютный путь от /app
+            new DatabaseReader(absoluteDbPath)
         );
 
-        // Add the new service layer
+        // Register existing services
+        builder.Services.AddSingleton<IDataReader>(_ =>
+            new DatabaseReader(Path.GetFullPath(dbPath))
+        );
+
         builder.Services.AddSingleton<IScheduleService, ScheduleService>();
+
+        builder.Services.AddControllers();
+        builder.Services.AddMemoryCache();
+
+        // Добавлено для HTTP-запросов к Yandex API
+        builder.Services.AddHttpClient();
+
+        // Register new services for rating system
+        builder.Services.AddSingleton<IAuthService, AuthService>();
+        builder.Services.AddSingleton<IRatingService, RatingService>();
     }
 
     public static void MapApi(this WebApplication app)
     {
+        // Add authentication/authorization middleware
+        app.UseAuthentication();
+        app.UseAuthorization();
+
+        // Map controllers
+        app.MapControllers();
+
+        // Keep existing endpoints
         app.MapGet("/api/groups", (IScheduleService service, ILogger<Program> log) =>
         {
             log.LogInformation("GET /api/groups");
@@ -148,6 +211,16 @@ static class StartupExtensions
             }
 
             return Results.Json(schedule);
+        });
+
+        app.MapGet("/api/teachers/validate", (string name, IScheduleService service, ILogger<Program> log) =>
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return Results.BadRequest(new { error = "Missing 'name' parameter" });
+
+            var exists = service.GetTeachers().Contains(name, StringComparer.OrdinalIgnoreCase);
+            log.LogInformation("Validated teacher '{TeacherName}': {Exists}", name, exists);
+            return Results.Json(new { exists });
         });
     }
 }

@@ -1,7 +1,7 @@
 1. [python скрипт](./pdfparser/main.py) парсит pdf в json. Одна группа - один json.
 2. [c# database](./StankinAppDatabase/StankinAppDatabase/) позволяет создавать базу данных из json. Создаётся sql база для всего заведения.
 3. [c# web api](./StankinAppDatabase/StankinAppApi/). предоставляет доступ к БД.
-4. [alpine js + tailwind](./Web/) pwa frontend
+4. [alpine js + tailwind](./stankin-schedule/) pwa frontend
 
 For live server
 ```
@@ -17,7 +17,7 @@ For live server
 IP адреса хранятся в:
 - `StankinAppDatabase/StankinAppApi/Program.cs`
 - `StankinAppDatabase/StankinAppApi/StartupExtensions.cs`
-- `Web/src/config.js`
+- `stankin-schedule/src/config.js`
 
 Debug
 ```
@@ -39,7 +39,7 @@ sudo ufw allow 5001/tcp
 # + В `config:js` вставить ip.
 ip addr show  | grep inet
 
-cd .../StankinApp/Web/
+cd .../StankinApp/stankin-schedule/
 live-server --host=0.0.0.0 --port=5173
 
 dotnet run --urls "http://0.0.0.0:5001"

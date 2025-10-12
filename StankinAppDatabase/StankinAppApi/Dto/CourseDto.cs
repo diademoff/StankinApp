@@ -1,6 +1,6 @@
 using StankinAppCore;
 
-namespace StankinAppApi;
+namespace StankinAppApi.Dto;
 
 public struct CourseDto
 {

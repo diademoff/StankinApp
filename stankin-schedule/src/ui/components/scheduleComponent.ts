@@ -4,10 +4,25 @@ import { Lesson } from '../../shared/types';
 import { ScheduleMemory } from '../../shared/scheduleMemory';
 import Swiper from 'swiper';
 import 'swiper/css';
+import { ApiClient } from '../../infra/api/ApiClient';
+
+interface TopComment {
+  id: number;
+  content: string;
+  votes: number;
+}
+
+interface RatingData {
+  id: number;
+  avg: number | '-'; // потому что у "Не указан" стоит '-'
+  count: number;
+  topComments: TopComment[];
+}
 
 export function scheduleComponent(
   groupName: string,
-  loadScheduleUseCase: LoadScheduleWeekUseCase
+  loadScheduleUseCase: LoadScheduleWeekUseCase,
+  api: ApiClient
 ) {
   const mem = new ScheduleMemory();
 
@@ -27,6 +42,9 @@ export function scheduleComponent(
     observerTop: null as IntersectionObserver | null,
     observerBottom: null as IntersectionObserver | null,
     updating: false,
+    isDiscussionModalOpen: false,
+    selectedLessonForModal: null as Lesson | null,
+    teacherRatings: {} as Record<string, { avg: string | number; count: number }>,
 
     updateGroupedSchedule() {
       this.groupedSchedule = mem.asGroupedObject();
@@ -84,6 +102,13 @@ export function scheduleComponent(
         mem.ensureDaysRange(weekStartDate, weekEnd);
 
         this.updateGroupedSchedule();
+        for (const lesson of lessons) {
+          if (lesson.teacher) {
+            this.fetchAndCacheTeacherRating(lesson.teacher);
+            this.ensureTeacherRating(lesson.teacher); // запускаем без await — фоновая загрузка
+          }
+        }
+        
         return { lessons };
       } catch (e) {
         console.error('loadWeek error', e);
@@ -316,6 +341,81 @@ export function scheduleComponent(
 
     destroy() {
       this.disconnectObservers();
+    },
+
+    async openDiscussionModal(lesson: Lesson) {
+      if (!lesson.teacher) return;
+      this.selectedLessonForModal = lesson;
+      this.isDiscussionModalOpen = true;
+
+      // Гарантируем, что рейтинг загружен
+      await this.ensureTeacherRating(lesson.teacher);
+    },
+
+    async ensureTeacherRating(teacherName: string) {
+      if (!teacherName || this.teacherRatings[teacherName]) return;
+
+      try {
+        const result = await api.getTeacherRating(teacherName);
+        const data = result?.data;
+        this.teacherRatings[teacherName] = {
+          avg: data?.averageScore !== undefined ? data.averageScore.toFixed(1) : '–',
+          count: data?.ratingsCount || 0,
+        };
+      } catch (err) {
+        console.error('Failed to fetch rating for', teacherName, err);
+        this.teacherRatings[teacherName] = { avg: '–', count: 0 };
+      }
+    },
+
+    closeDiscussionModal() {
+      this.isDiscussionModalOpen = false;
+    },
+
+    getTeacherRating(teacherName: string) {
+      // Теперь используем api вместо прямого fetch
+      return api.getTeacherRating(teacherName)
+        .then(result => {
+          const data = result?.data;  // ApiClient возвращает { data: ... }, судя по вашему backend (ApiResponse<RatingAggregateResponse>)
+          return {
+            avg: data?.averageScore?.toFixed(1) || 'N/A',  // toFixed для формата, как в teacherDiscussionApp
+            count: data?.ratingsCount || 0
+          };
+        })
+        .catch(err => {
+          console.error('Error fetching rating:', err);
+          return { avg: 'N/A', count: 0 };
+        });
+    },
+
+    async fetchAndCacheTeacherRating(teacherName: string) {
+      if (!teacherName || this.teacherRatings[teacherName]) return;
+
+      try {
+        const result = await api.getTeacherRating(teacherName);
+        const data = result?.data;
+        this.teacherRatings[teacherName] = {
+          avg: data?.averageScore !== undefined ? data.averageScore.toFixed(1) : '–',
+          count: data?.ratingsCount || 0
+        };
+      } catch (err) {
+        console.error('Failed to fetch rating for', teacherName, err);
+        this.teacherRatings[teacherName] = { avg: '–', count: 0 };
+      }
+    },
+
+    getTopComments(teacherName: string) {
+      return fetch(`/api/teachers/${encodeURIComponent(teacherName)}/comments?page=1&limit=3`)
+        .then(res => res.json())
+        .then(data => data.comments.map((c: { id: number; content: string; votes: number; }) => ({
+          id: c.id as number,
+          content: c.content as string,
+          votes: c.votes as number
+        })) || [])
+        .catch(err => {
+          console.error('Error fetching comments:', err);
+          return [];
+        });
     }
   };
 }
