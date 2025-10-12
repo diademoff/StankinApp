@@ -12,7 +12,8 @@ import { AuthRepository } from './core/ports/AuthRepository';
 import { AuthWithYandexUseCase } from './core/use-cases/AuthWithYandexUseCase';
 import { HttpAuthRepository } from './infra/repositories/HttpAuthRepository';
 
-const api = new ApiClient('http://localhost:5000'); // Используйте ваш API_URL в проде
+const api = new ApiClient('');
+// const api = new ApiClient('http://localhost:5000'); // debug only
 const cache = new LocalStorageCache();
 
 const groupRepo = new HttpGroupRepository(api, cache);

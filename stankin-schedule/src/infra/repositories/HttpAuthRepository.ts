@@ -5,14 +5,27 @@ export class HttpAuthRepository implements AuthRepository {
   constructor(private api: ApiClient) {}
 
   async exchangeYandexToken(token: string): Promise<string> {
+/*
+Response object: 
+{
+    "jwt": null,
+    "token": "..",
+    "user": {
+        "id": 1,
+        "firstName": "",
+        "username": "",
+        "photoUrl": "https://"
+    }
+}
+ */
     console.log('HttpAuthRepository: Exchanging Yandex token'); // Logger: info
     try {
       const response = await this.api.postYandexToken(token);
-      if (!response || !response.jwt) {
+      if (!response) {
         throw new Error('Invalid response from API: no JWT');
       }
       console.log('HttpAuthRepository: Exchange successful'); // Validation: success
-      return response.jwt;
+      return response.token;
     } catch (error) {
       console.error('HttpAuthRepository: Exchange failed', error); // Logger: error
       throw error;
