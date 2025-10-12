@@ -66,6 +66,13 @@ export class ApiClient {
   }
 
   async getUserRating(teacherName: string): Promise<any> {
+    /* Возвращает оценку, которую дал студент преподавателю:
+      {
+        "data": {
+          "score": 10
+        }
+      }
+     */
     const url = `${this.base}/api/teachers/get-user-rating?name=${encodeURIComponent(teacherName)}`;
     return this.fetchJson(url);
   }

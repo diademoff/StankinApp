@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="ru" class="h-full">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -7,6 +8,7 @@
   <script type="module" src="/src/main.ts"></script>
   <script src="https://yastatic.net/s3/passport-sdk/autofill/v1/sdk-suggest-with-polyfills-latest.js"></script>
 </head>
+
 <body class="h-full flex flex-col bg-gray-100 text-gray-800" x-data="teacherDiscussionApp" x-init="init()">
   <div class="flex-1 min-h-0 flex flex-col max-w-xl mx-auto w-full py-10 px-4 space-y-6">
 
@@ -50,20 +52,27 @@
                 <button @click="logout()" class="text-sm text-red-500 hover:underline">Выйти</button>
               </div>
               <div>
-                <h4 class="font-semibold mb-2 text-sm">Ваша оценка:</h4>
+                <div class="flex items-center gap-2 mb-2">
+                  <h4 class="font-semibold text-sm">Ваша оценка:</h4>
+                  <span x-show="user.ownRating > 0" x-text="`${user.ownRating}/10`"
+                    class="font-bold text-sm bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">
+                  </span>
+                </div>
                 <div class="flex items-center space-x-1">
                   <template x-for="star in 10" :key="star">
                     <button @click="rateTeacher(star)"
-                      class="text-2xl transition-transform duration-150 hover:scale-125"
-                      :class="user.ownRating >= star ? 'text-yellow-400' : 'text-gray-300'">★</button>
+                      class="text-2xl transition-transform duration-150 hover:scale-125 focus:outline-none"
+                      x-text="user.ownRating >= star ? '⭐' : '☆'">
+                    </button>
                   </template>
                 </div>
               </div>
             </div>
-          </template>
-        </section>
       </div>
     </template>
+    </section>
+  </div>
+  </template>
   </div>
   <footer class="text-center text-sm text-gray-500 py-1">
     <a href="/index.html" class="text-xs text-gray-600 hover:text-blue-600 hover:underline transition">
@@ -71,4 +80,5 @@
     </a>
   </footer>
 </body>
+
 </html>
