@@ -108,7 +108,7 @@ export function scheduleComponent(
             this.ensureTeacherRating(lesson.teacher); // запускаем без await — фоновая загрузка
           }
         }
-        
+
         return { lessons };
       } catch (e) {
         console.error('loadWeek error', e);
@@ -296,15 +296,28 @@ export function scheduleComponent(
       this.weekStart = DateUtils.startOfWeek(new Date());
 
       try {
+        // 1. Загружаем данные для текущей недели
         await this.loadWeek(this.weekStart, 'initial');
         this.updateGroupedSchedule();
 
-        await new Promise(r => requestAnimationFrame(r));
+        // 2. Ждем, пока Alpine.js отрисует DOM
+        await (this as any).$nextTick();
+
+        // 3. Мгновенно устанавливаем позицию прокрутки
+        const container = (this as any).$refs.scheduleContainer;
+        if (container) {
+          const todayStr = DateUtils.toIsoDate(new Date());
+          const todayElement = container.querySelector(`#date-${todayStr}`) as HTMLElement;
+
+          if (todayElement) {
+            // Прямая установка scrollTop для мгновенного позиционирования
+            container.scrollTop = todayElement.offsetTop;
+          }
+        }
+
+        // 4. Устанавливаем наблюдателей для бесконечной прокрутки
         this.setupObservers();
 
-        const now = DateUtils.toIsoDate(new Date());
-        await (this as any).$nextTick();
-        await this.scrollToDate(now, 5, 200);
       } catch (e) {
         console.error('initial load failed', e);
       }
