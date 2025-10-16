@@ -84,7 +84,6 @@
               </div>
             </template>
 
-            <!-- Шаг 2: Аббревиатура -->
             <template x-if="selectedYear && !selectedAbbr">
               <div class="flex-1">
                 <div class="flex items-center mb-4">
@@ -176,7 +175,8 @@
             </template>
 
             <template x-for="entry in Object.entries(groupedSchedule)" :key="entry[0]">
-              <div :id="'date-' + entry[0]" class="mb-6">
+              <div :id="'date-' + entry[0]" class="mb-6 transition-all"
+                :class="{ 'p-4 border border-blue-300 rounded-2xl': new Date().toISOString().slice(0, 10) === entry[0] }">
                 <h2 class="text-lg font-semibold mb-2 text-center" x-text="formatDate(entry[0])"></h2>
                 <div class="space-y-4">
                   <template x-if="entry[1].length === 0">
