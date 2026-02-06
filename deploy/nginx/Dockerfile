@@ -2,6 +2,7 @@
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app
 COPY ./stankin-schedule/package*.json ./
+RUN npm install
 RUN npm ci --silent
 COPY ./stankin-schedule/ .
 RUN npm run build

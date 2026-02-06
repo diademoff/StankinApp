@@ -32,6 +32,7 @@ services:
     volumes:
       - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
       - /etc/letsencrypt:/etc/letsencrypt
+      - ./deploy/nginx/html:/var/www/certbot:ro
     restart: unless-stopped
     command: >
       sh -c "nginx -g 'daemon off;' &
