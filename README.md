@@ -54,22 +54,7 @@ app.Urls.Add("https://192.168.0.103:5002");
 
 
 Deploy
-```sh
-apt install docker docker-compose git npm nginx certbot python3-certbot-nginx
-# StartupExtensions.cs set available ip
-# prometheus.yml и добавить API как таргет targets: ['192.168.0.103:5001']
-./prometheus --config.file=prometheus.yml
 
-# в корне репы
-mkdir -p data deploy/nginx/conf.d deploy/certbot/www deploy/certbot/conf
-# скопируйте sqlite в ./data/stankin.db
-scp /home/dmff/repos/StankinApp/dbBuilder/schedule.db stankin@89.111.131.170:/home/stankin/stankin.db
-
-
-# проверить путь к ssl файлам
-docker compose build --pull
-docker compose up -d
-```
 <!-- TODO -->
 Building api
 DEPRECATED: The legacy builder is deprecated and will be removed in a future release.
@@ -114,3 +99,42 @@ sudo certbot renew --dry-run
 ```
 
 clean docker: `docker system prune -a -f`
+
+# Deploy
+```sh
+# Скачать docker и 'docker compose' https://docs.docker.com/engine/install/ubuntu/
+apt install git
+
+ufw allow 80
+
+
+# в корне репы
+mkdir -p data deploy/nginx/conf.d deploy/certbot/www deploy/certbot/conf
+# скопируйте sqlite в ./data/stankin.db
+scp /home/dmff/repos/StankinApp/dbBuilder/schedule.db stankin@89.111.131.170:/home/stankin/stankin.db
+
+# Первый раз получить ssl сертификат
+# Вам нужно временно «отключить» HTTPS-секцию, чтобы Nginx смог стартовать только на 80-м порту.
+# deploy/nginx/conf.d/default.conf
+
+# Теперь запустите только веб-сервер
+docker compose up -d web
+
+# Получить сертификат в первый раз
+docker run --rm -it --name certbot -v "/etc/letsencrypt:/etc/letsencrypt" -v "$(pwd)/deploy/nginx/html:/var/www/certbot" certbot/certbot certonly --webroot -w /var/www/certbot -d stankinapp.ru --email diademoff@yandex.ru --agree-tos
+
+# Автопродление сертификата (проверьте абсолютный путь до StankinApp)
+crontab -e
+0 3 * * * docker run --rm -v "/etc/letsencrypt:/etc/letsencrypt" -v "/home/stankin/StankinApp/deploy/nginx/html:/var/www/certbot" certbot/certbot renew --quiet && docker exec stankinapp_web_1 nginx -s reload
+
+# Продлить сертификат вручную (без --dry-run)
+docker run --rm -v "/etc/letsencrypt:/etc/letsencrypt" -v "$(pwd)/deploy/nginx/html:/var/www/certbot" certbot/certbot renew --dry-run
+
+# Возвращаем https в nginx: deploy/nginx/conf.d/default.conf
+
+# Деплой (не забудь обновить год)
+./deploy.sh
+
+# Не забудь проверить путь к ssl файлам
+docker compose up -d --build
+```
