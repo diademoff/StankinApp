@@ -7,7 +7,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://0.0.0.0:5000
-      - Database__Path=/app/data/schedule.db  # Путь к БД внутри контейнера (override, если нужно)
+      - Database__Path=/app/data/schedule.db
       - Jwt__Secret=${Jwt__Secret}
       - Jwt__Issuer=${Jwt__Issuer}
       - Jwt__Audience=${Jwt__Audience}
@@ -15,7 +15,7 @@ services:
       - Yandex__ClientSecret=${Yandex__ClientSecret}
       - Yandex__ClientId=${Yandex__ClientId}
     volumes:
-      - ./deploy/data:/app/data  # Bind-mount для persistent БД (на хосте: ./db-data/schedule.db)
+      - ./deploy/data:/app/data
       - ~/.microsoft/usersecrets:/root/.microsoft/usersecrets:ro
     restart: unless-stopped
 
