@@ -15,17 +15,14 @@ static class StartupExtensions
 {
     static string[] AvailableIp = [
         "https://stankinapp.ru",
-        "http://stankinapp.ru",
-        "https://www.stankinapp.ru",
-        "https://89.111.131.170",
-        "http://89.111.131.170"
+        "http://stankinapp.ru"
     ];
 
     public static void ConfigureLogging(this WebApplicationBuilder builder)
     {
         Log.Logger = new LoggerConfiguration()
             .Enrich.FromLogContext()
-            .MinimumLevel.Debug()
+            .MinimumLevel.Error()
             .WriteTo.Console()
             .WriteTo.File(
                 path: "Logs/schedule-api-.log",
