@@ -30,17 +30,17 @@ namespace StankinAppDatabase
             //    "read",
             //    "--help"
             //};
-            args = new string[]
-            {
-               "create",
-               "--json-path",
-               "/home/dmff/repos/StankinApp/pdfparser/json",
-               "--year",
-               "2025",
+            // args = new string[]
+            // {
+            //    "create",
+            //    "--json-path",
+            //    "/home/dmff/repos/StankinApp/pdfparser/json",
+            //    "--year",
+            //    "2026",
             //    // Optional
             //    "--db-save-path",
             //    "D:\\database.db"
-            };
+            // };
 
             var rootCommand = new RootCommand("Утилита для работы с базой данных расписания");
 
