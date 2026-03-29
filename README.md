@@ -1,131 +1,318 @@
-Веб-приложение для просмотра расписания занятий в университете ФГАОУ ВО МГТУ Станкин.
+# StankinApp — Расписание МГТУ Станкин
 
+PWA-приложение для просмотра расписания занятий [ФГАОУ ВО МГТУ «Станкин»](https://stankin.ru).
+Расписание кэшируется на устройстве и доступно **offline**.
 
-1. [python скрипт](./pdfparser/main.py) парсит pdf в json. Одна группа - один json.
-2. [c# database](./StankinAppDatabase/StankinAppDatabase/) позволяет создавать базу данных из json. Создаётся sql база для всего университета целиком.
-3. [c# web api](./StankinAppDatabase/StankinAppApi/). предоставляет доступ к БД.
-4. [alpine js + tailwind](./stankin-schedule/) pwa frontend
+---
 
-# Dev
+## Архитектура
 
-Для разработки в visual studio code с расширением `live server` установите настройки:
+Репозиторий — монорепо из четырёх независимых компонентов:
+
 ```
-"liveServer.settings.ignoreFiles": [
-  ".vscode/**",
-  "**/*.scss",
-  "**/*.sass",
-  "**/*.ts",
-  "StankinAppDatabase/**"
-]
+.
+├── pdfparser/              # Python: парсит PDF расписания → JSON
+├── StankinAppDatabase/
+│   ├── StankinAppCore/     # C# библиотека: модели, чтение БД
+│   ├── StankinAppDatabase/ # C# CLI: строит SQLite из JSON
+│   ├── StankinAppApi/      # C# Web API: REST поверх SQLite
+│   └── StankinAppDatabase.Tests/
+├── stankin-schedule/       # TypeScript PWA: Alpine.js + Tailwind
+└── deploy/                 # Nginx, Docker Compose, сертификаты
 ```
 
-На случай, если необходимо перенести сайт на другой сервер/домен. IP адреса хранятся в:
-- `StankinAppDatabase/StankinAppApi/Program.cs`
-- `StankinAppDatabase/StankinAppApi/StartupExtensions.cs`
-- `stankin-schedule/src/config.js`
+### Поток данных
 
-
-Для отладки можно использовать
 ```
+PDF расписания (опубликованы на сайте университета)
+    │
+    ▼
+pdfparser/main.py   →  JSON файлы (одна группа = один файл)
+    │
+    ▼
+StankinAppDatabase  →  schedule.db  (SQLite, всё расписание)
+    │
+    ▼
+StankinAppApi       →  REST JSON API  (GET /api/schedule, /api/groups, ...)
+    │
+    ▼
+stankin-schedule    →  PWA в браузере
+```
+
+---
+
+## Требования
+
+| Компонент         | Инструмент |
+|-------------------|------------------------|
+| PDF парсер        | Python 3.10+           |
+| База данных / API | .NET 8 SDK             |
+| Фронтенд          | Node.js 20+, npm       |
+| Деплой            | Docker, Docker Compose |
+
+---
+
+## Быстрый старт (разработка)
+
+### 1. Парсинг PDF в JSON
+
+```bash
+cd pdfparser
+./install_venv.sh          # создаёт venv и ставит зависимости
+source .venv/bin/activate
+python main.py             # укажите путь к PDF по запросу скрипта
+```
+
+Результат: папка с JSON-файлами по группам.
+
+### 2. Сборка базы данных
+
+```bash
+cd StankinAppDatabase/StankinAppDatabase
+dotnet run -- create --json-path /path/to/json-folder --year 2026 --db-save-path schedule.db
+```
+
+Файл `schedule.db` — готовая SQLite база, которую нужно положить в `./deploy/data/`.
+
+### 3. Запуск API
+
+```bash
+cd StankinAppDatabase/StankinAppApi
+dotnet run
+# API слушает http://localhost:5000
+```
+
+Проверить:
+```
+GET http://localhost:5000/api/groups
+GET http://localhost:5000/api/schedule?groupName=АДБ-23-04&startDate=2026-03-29&endDate=2026-04-04
+```
+
+Коллекция запросов Bruno: `StankinAppDatabase/StankinAppApi/api/`
+
+### 4. Запуск фронтенда
+
+```bash
+cd stankin-schedule
+npm install
+npm run dev
+# Открыть http://localhost:5173
+```
+
+---
+
+## Конфигурация
+
+### База данных
+
+Путь к SQLite в `StankinAppDatabase/StankinAppApi/appsettings.json`:
+
+```json
+{
+  "Database": {
+    "Path": "data/stankin.db"
+  }
+}
+```
+
+Для разработки — `appsettings.Development.json`:
+
+```json
+{
+  "Database": {
+    "Path": "schedule.db"
+  }
+}
+```
+
+---
+
+## Тестирование API вручную (Bruno)
+
+В папке `StankinAppDatabase/StankinAppApi/api/` лежит коллекция [Bruno](https://www.usebruno.com/).
+
+---
+
+## Отладка на мобильном устройстве (локальная сеть)
+
+```bash
+# Узнать IP машины
+ip addr show | grep inet
+
+# Запустить фронтенд доступным в локальной сети
+cd stankin-schedule
+npm run dev -- --host
+
+# Запустить API
+cd StankinAppDatabase/StankinAppApi
+dotnet run --urls "http://0.0.0.0:5000"
+
+# Открыть файрвол при необходимости
+sudo ufw allow 5173/tcp
+sudo ufw allow 5000/tcp
+```
+
+Затем с телефона открыть `http://<IP машины>:5173`.
+
+Для Chrome DevTools remote debugging:
+```bash
 chromium --remote-debugging-port=9222
 ```
 
-Запуск front end (в папке `./stankin-schedule`)
-```sh
-npm install
-npm run dev
+---
+
+## Запуск тестов
+
+```bash
+cd StankinAppDatabase
+dotnet test StankinAppDatabase.Tests/
 ```
 
-Для debug запуска, используя live-server, чтобы протестировать на устройствах в локальной сети (например, зайти с телефона)
-```sh
-sudo npm install -g live-server
-sudo ufw allow 5173/tcp
-sudo ufw allow 5001/tcp
+---
 
-# ip addr -> тут сайт 192.168.0.103
-# + В `config:js` вставить ip.
-ip addr show  | grep inet
+## Деплой (Docker Compose)
 
-# В папке stankin-schedule
-live-server --host=0.0.0.0 --port=5173
+### Структура
 
-# В папке StankinAppDatabase
-dotnet run --urls "http://0.0.0.0:5001"
 ```
-
-Для изменения порта api (`./StankinAppDatabase/StankinAppApi/Program.cs`):
-
-```cs
-app.Urls.Add("http://192.168.0.103:5001");
-app.Urls.Add("https://192.168.0.103:5002");
+deploy/
+├── data/           # Сюда кладём stankin.db
+├── nginx/
+│   ├── conf.d/     # Конфиг виртуального хоста
+│   ├── nginx.conf
+│   └── proxy_params
+docker-compose.yml
 ```
 
 
-# Deploy
+### Первичный деплой на чистый VPS (Ubuntu)
 
-Deploy происходит через docker
-```sh
-docker compose up -d --build # запуск всех сервисов в фоне
-docker compose down          # остановка и удаление контейнеров
-docker compose ps            # статус контейнеров
-docker system prune -a -f    # очистить всё
+#### 1. Подготовка сервера
 
-docker compose logs -f api
-docker compose logs -f web
-```
+```bash
+# Установить Docker (https://docs.docker.com/engine/install/ubuntu/)
+apt install git docker.io
 
-На чистом VPS Ubuntu server выполняем следующее
-```sh
-user: stankin:stankinapp
-su - stankin
-
-# Получить сертификат
-sudo mkdir -p /etc/letsencrypt
-sudo certbot certonly --nginx -d stankinapp.ru --email diademoff@yandex.ru --agree-tos --non-interactive
-# В корне репы
-sudo ln -sf /etc/letsencrypt ./deploy/certbot/conf || sudo rm -rf ./deploy/certbot/conf && sudo ln -sf /etc/letsencrypt ./deploy/certbot/conf
-
-
-
-# Потом: Раскомментируйте HTTPS в Nginx и перезагрузит
-sudo certbot renew --dry-run
-```
-
-```sh
-# Скачать docker и 'docker compose' https://docs.docker.com/engine/install/ubuntu/
-apt install git
-
+# Открыть порты
 ufw allow 80
+ufw allow 443
+```
 
-# в корне репы
-mkdir -p data deploy/nginx/conf.d deploy/certbot/www deploy/certbot/conf
-# скопируйте sqlite в ./data/stankin.db
-scp /path/to/database/schedule.db stankin@89.111.131.170:/path/to/deploy/data/put-stankindb-here
+#### 2. Клонировать репо и подготовить структуру
 
-# Первый раз получить ssl сертификат
-# Вам нужно временно «отключить» HTTPS-секцию, чтобы Nginx смог стартовать только на 80-м порту.
-# deploy/nginx/conf.d/default.conf
+```bash
+git clone <repo-url> && cd StankinApp
+mkdir -p deploy/nginx/conf.d deploy/certbot/www deploy/certbot/conf data
+```
 
-# Теперь запустите только веб-сервер
+#### 3. Скопировать базу данных
+
+```bash
+scp /local/path/stankin.db stankin@<server-ip>:/home/stankin/StankinApp/deploy/data/
+```
+
+#### 4. Получить SSL-сертификат (Let's Encrypt)
+
+```bash
+# Шаг 1: временно закомментировать HTTPS-блок в deploy/nginx/conf.d/default.conf
+# Шаг 2: поднять только Nginx
 docker compose up -d web
 
-# Получить сертификат в первый раз
-docker run --rm -it --name certbot -v "/etc/letsencrypt:/etc/letsencrypt" -v "$(pwd)/deploy/nginx/html:/var/www/certbot" certbot/certbot certonly --webroot -w /var/www/certbot -d stankinapp.ru --email diademoff@yandex.ru --agree-tos
+# Шаг 3: получить сертификат через webroot
+docker run --rm -it \
+  -v "/etc/letsencrypt:/etc/letsencrypt" \
+  -v "$(pwd)/deploy/nginx/html:/var/www/certbot" \
+  certbot/certbot certonly --webroot \
+  -w /var/www/certbot -d stankinapp.ru \
+  --email your@email.ru --agree-tos
 
-# Автопродление сертификата (проверьте абсолютный путь до StankinApp)
+# Шаг 4: вернуть HTTPS-блок в nginx конфиг
+# Шаг 5: пробросить сертификаты
+sudo ln -sf /etc/letsencrypt ./deploy/certbot/conf
+```
+
+#### 5. Автопродление сертификата
+
+```bash
 crontab -e
-0 3 * * * docker run --rm -v "/etc/letsencrypt:/etc/letsencrypt" -v "/home/stankin/StankinApp/deploy/nginx/html:/var/www/certbot" certbot/certbot renew --quiet && docker exec stankinapp_web_1 nginx -s reload
+# Добавить строку:
+0 3 * * * docker run --rm \
+  -v "/etc/letsencrypt:/etc/letsencrypt" \
+  -v "/home/stankin/StankinApp/deploy/nginx/html:/var/www/certbot" \
+  certbot/certbot renew --quiet && \
+  docker exec stankinapp_web_1 nginx -s reload
+```
 
-# Продлить сертификат вручную (без --dry-run)
-docker run --rm -v "/etc/letsencrypt:/etc/letsencrypt" -v "$(pwd)/deploy/nginx/html:/var/www/certbot" certbot/certbot renew --dry-run
+#### 6. Запуск
 
-# Возвращаем https в nginx: deploy/nginx/conf.d/default.conf
-
-# Установите значения в .env файле
-
-# Деплой (не забудь обновить год)
+```bash
 ./deploy.sh
-
-# Не забудь проверить путь к ssl файлам
 docker compose up -d --build
 ```
+
+---
+
+## Структура API
+
+| Метод | Эндпоинт                 | Описание                             |
+|-------|--------------------------|--------------------------------------|
+| GET   | `/api/groups`            | Список всех учебных групп            |
+| GET   | `/api/rooms`             | Список аудиторий                     |
+| GET   | `/api/teachers`          | Список преподавателей                |
+| GET   | `/api/schedule`          | Расписание группы за период          |
+| GET   | `/api/teachers/validate` | Проверка существования преподавателя |
+
+**Параметры `/api/schedule`:**
+
+| Параметр | Тип | Пример |
+|----------|-----|--------|
+| `groupName` | string | `АДБ-23-04` |
+| `startDate` | string (ISO) | `2026-03-29` |
+| `endDate` | string (ISO) | `2026-04-04` |
+
+**Формат ответа `/api/schedule`:**
+
+```json
+{
+  "metadata": {
+    "nextWeek": "2026-04-05",
+    "prevWeek": "2026-03-22",
+    "periodStart": "2026-03-29",
+    "periodEnd": "2026-04-04",
+    "isLastWeek": false
+  },
+  "items": [
+    {
+      "id": "АДБ-23-04_2026-03-29_08:30_all",
+      "date": "2026-03-29",
+      "startTime": "08:30",
+      "endTime": "10:00",
+      "durationMinutes": 90,
+      "subject": "Математика",
+      "teacher": "Иванов И.И.",
+      "type": "Лекция",
+      "cabinet": "А-101",
+      "subgroup": "",
+      "sequencePosition": 1,
+      "sequenceLength": 1
+    }
+  ]
+}
+```
+
+HTTP-статусы: `200` — данные есть, `204` — пар за период нет, `400` — неверные параметры.
+
+---
+
+## Стек технологий
+
+| Слой | Технология | Лицензия |
+|------|-----------|---------|
+| PDF парсер | Python | MIT |
+| БД / Core | .NET 8, SQLite | MIT / Public Domain |
+| Web API | ASP.NET Core, Dapper, NodaTime | MIT |
+| Мониторинг | OpenTelemetry, Serilog | Apache 2.0 |
+| Фронтенд | Alpine.js, Tailwind CSS, Vite | MIT |
+| PWA | vite-plugin-pwa, Workbox | MIT |
+| Деплой | Docker, Nginx | Apache 2.0 / BSD |
+| API-тесты | Bruno | MIT |

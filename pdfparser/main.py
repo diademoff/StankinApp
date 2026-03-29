@@ -151,9 +151,8 @@ def extractByFilename(filename):
         json.dump(finalData, f, ensure_ascii=False, indent=4)
 
 # https://edu.stankin.ru/course/view.php?id=11557
-print("folder path: ")
-# folder: str = input()
-folder: str = '/home/dmff/repos/StankinApp/pdfparser/pdf'
+print("Укажите путь к папке с pdf файлами: ")
+folder: str = input()
 filenames = os.listdir(folder)
 
 for filename in filenames:
