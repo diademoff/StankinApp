@@ -10,6 +10,7 @@ export class HttpGroupRepository implements GroupRepository {
     const key = this.cache.buildKey('groups');
     const cached = this.cache.get(key, SCHEDULE_CONFIG.CACHE_TTL_MS / 2);
     if (cached) return cached;
+
     const groups = await this.api.getGroups();
     this.cache.set(key, groups);
     return groups;

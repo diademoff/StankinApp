@@ -7,13 +7,7 @@ export class ScheduleMemory {
 
   setDay(dateStr: string, lessons: Lesson[]): void {
     const sorted = (lessons || []).slice().sort((a, b) => {
-      const ah = a.startTime?.hour ?? 0;
-      const am = a.startTime?.minute ?? 0;
-      const bh = b.startTime?.hour ?? 0;
-      const bm = b.startTime?.minute ?? 0;
-      const ta = ah * 60 + am;
-      const tb = bh * 60 + bm;
-      if (ta !== tb) return ta - tb;
+      if (a.startTime !== b.startTime) return a.startTime.localeCompare(b.startTime);
       return (a.sequencePosition || 0) - (b.sequencePosition || 0);
     });
 
@@ -39,13 +33,13 @@ export class ScheduleMemory {
   }
 
   private static lessonKey(l: Lesson): string {
-    return [
+    return l.id ?? [
       l.subject ?? '',
       l.teacher ?? '',
       l.type ?? '',
       l.cabinet ?? '',
-      `${l.startTime?.hour ?? ''}:${l.startTime?.minute ?? ''}`,
-      l.duration?.minutes ?? ''
+      l.startTime ?? '',
+      l.durationMinutes ?? ''
     ].join('|');
   }
 

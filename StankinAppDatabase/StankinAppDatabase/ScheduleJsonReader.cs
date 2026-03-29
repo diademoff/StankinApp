@@ -166,7 +166,7 @@ namespace StankinAppDatabase
 
             var dateSchedules = new List<LocalDate>();
 
-            var parts = datesString.Split([','], StringSplitOptions.RemoveEmptyEntries);
+            var parts = datesString.Split(',', StringSplitOptions.RemoveEmptyEntries);
             foreach (var part in parts)
             {
                 var trimmed = part.Trim();

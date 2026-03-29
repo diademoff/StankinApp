@@ -1,83 +1,36 @@
-using StankinAppCore;
-
 namespace StankinAppApi.Dto;
 
-public struct CourseDto
-{
-    public SimpleTime StartTime { get; set; }
-    public DurationType Duration { get; set; }
-    public List<SimpleDate> Dates { get; set; }
-    public string GroupName { get; set; }
-    public string Subject { get; set; }
-    public string Teacher { get; set; }
-    public string Type { get; set; }
-    public string Subgroup { get; set; }
-    public string Cabinet { get; set; }
-    public int SequencePosition { get; set; }
-    public int SequenceLength { get; set; }
+/// <summary>
+/// Плоский DTO одного занятия. Все поля готовы для Alpine.js:
+/// — даты как ISO 8601 строки
+/// — тип занятия как читаемая строка ("Лекция", "Семинар", ...)
+/// — уникальный id для x-for :key
+/// </summary>
+public record CourseDto(
+    /// <summary>Уникальный ключ для Alpine x-for :key. Формат: "groupName_date_startTime_subgroup"</summary>
+    string Id,
 
-    public CourseDto(Course c)
-    {
-        this.StartTime = new SimpleTime(c.StartTime.Hour, c.StartTime.Minute);
-        this.Duration = new DurationType(c.Duration.Hours * 60 + c.Duration.Minutes);
-        this.Dates = c.Dates.Select(x => new SimpleDate(x.Year, x.Month, x.Day)).ToList();
-        this.GroupName = c.GroupName;
-        this.Subject = c.Subject;
-        this.Teacher = c.Teacher;
-        switch (c.Type)
-        {
-            case "семинар":
-                this.Type = "Семинар";
-                break;
-            case "лекции":
-                this.Type = "Лекция";
-                break;
-            case "лабораторные занятия":
-                this.Type = "Лабораторная работа";
-                break;
-            default:
-                this.Type = c.Type;
-                break;
-        }
-        this.Subgroup = c.Subgroup;
-        this.Cabinet = c.Cabinet;
-        this.SequencePosition = c.SequencePosition;
-        this.SequenceLength = c.SequenceLength;
-    }
-}
+    /// <summary>Дата занятия без времени. Например: "2026-03-29"</summary>
+    string Date,
 
-public class SimpleTime
-{
-    public int Hour { get; set; }
-    public int Minute { get; set; }
+    /// <summary>Время начала. Например: "08:30"</summary>
+    string StartTime,
 
-    public SimpleTime(int hour, int minute)
-    {
-        Hour = hour;
-        Minute = minute;
-    }
-}
+    /// <summary>Время окончания. Например: "10:00"</summary>
+    string EndTime,
 
-public class SimpleDate
-{
-    public int Year { get; set; }
-    public int Month { get; set; }
-    public int Day { get; set; }
+    /// <summary>Длительность в минутах</summary>
+    int DurationMinutes,
 
-    public SimpleDate(int year, int month, int day)
-    {
-        Year = year;
-        Month = month;
-        Day = day;
-    }
-}
+    string GroupName,
+    string Subject,
+    string Teacher,
 
-public class DurationType
-{
-    public long Minutes { get; set; }
+    /// <summary>"Лекция" | "Семинар" | "Лабораторная работа"</summary>
+    string Type,
 
-    public DurationType(long minutes)
-    {
-        Minutes = minutes;
-    }
-}
+    string Subgroup,
+    string Cabinet,
+    int SequencePosition,
+    int SequenceLength
+);

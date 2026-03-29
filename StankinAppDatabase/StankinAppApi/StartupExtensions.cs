@@ -1,23 +1,17 @@
 using Serilog;
 using StankinAppCore;
+using StankinAppApi.Dto;
 using Microsoft.Extensions.Caching.Memory;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using StankinAppApi.Services;
-using System.Text;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace StankinAppApi;
 
 static class StartupExtensions
 {
-    static string[] AvailableIp = [
-        "https://stankinapp.ru",
-        "http://stankinapp.ru"
-    ];
-
     public static void ConfigureLogging(this WebApplicationBuilder builder)
     {
         Log.Logger = new LoggerConfiguration()
@@ -61,19 +55,16 @@ static class StartupExtensions
         });
     }
 
+
     public static void ConfigureCors(this WebApplicationBuilder builder)
     {
 #if DEBUG
         builder.Services.AddCors(o => o.AddPolicy("AllowFrontend", p =>
-            p.AllowAnyOrigin()
-                .AllowAnyHeader()
-                .AllowAnyMethod()
+            p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()
         ));
 #else
         builder.Services.AddCors(o => o.AddPolicy("AllowFrontend", p =>
-            p.WithOrigins(AvailableIp)
-                .AllowAnyHeader()
-                .AllowAnyMethod()
+            p.WithOrigins(AvailableIp).AllowAnyHeader().AllowAnyMethod()
         ));
 #endif
     }
@@ -82,132 +73,53 @@ static class StartupExtensions
     {
         var configuration = builder.Configuration;
 
-        // Add controllers support
-        builder.Services.AddControllers();
-
-        // Add memory cache
-        builder.Services.AddMemoryCache();
-
-        builder.Services.AddHttpClient(); // Для HttpClientFactory
-        builder.Services.AddSingleton<IAuthService, AuthService>();
-        builder.Services.AddSingleton<IRatingService, RatingService>();
-
-        // Configure Authentication
-        builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-            .AddJwtBearer(options =>
+        builder.Services.AddControllers()
+            .AddJsonOptions(opts =>
             {
-                var jwtConfig = builder.Configuration.GetSection("Jwt");
-                options.TokenValidationParameters = new()
-                {
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidateLifetime = true,
-                    ValidateIssuerSigningKey = true,
-                    ValidIssuer = jwtConfig["Issuer"],
-                    ValidAudience = jwtConfig["Audience"],
-                    IssuerSigningKey = new SymmetricSecurityKey(
-                        Encoding.UTF8.GetBytes(jwtConfig["Secret"]!))
-                };
+                opts.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+                opts.JsonSerializerOptions.DictionaryKeyPolicy = JsonNamingPolicy.CamelCase;
+                opts.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+                opts.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
             });
 
-        // Add Authorization
-        builder.Services.AddAuthorization();
+        builder.Services.AddMemoryCache();
+        builder.Services.AddHttpClient();
 
-        // Read database path from configuration (appsettings.json or appsettings.Development.json)
         var dbPath = configuration.GetValue<string>("Database:Path");
         if (string.IsNullOrEmpty(dbPath))
-        {
             throw new InvalidOperationException("Database path is not configured in appsettings.");
-        }
 
-        // Make path relative to the application's root directory if it's not already an absolute path
         var absoluteDbPath = Path.IsPathRooted(dbPath)
             ? dbPath
             : Path.Combine(builder.Environment.ContentRootPath, dbPath);
 
-        builder.Services.AddSingleton<IDataReader>(_ =>
-            new DatabaseReader(absoluteDbPath)
-        );
-
-        // Register existing services
-        builder.Services.AddSingleton<IDataReader>(_ =>
-            new DatabaseReader(Path.GetFullPath(dbPath))
-        );
-
+        builder.Services.AddSingleton<IDataReader>(_ => new DatabaseReader(absoluteDbPath));
         builder.Services.AddSingleton<IScheduleService, ScheduleService>();
-
-        builder.Services.AddControllers();
-        builder.Services.AddMemoryCache();
-
-        // Добавлено для HTTP-запросов к Yandex API
-        builder.Services.AddHttpClient();
-
-        // Register new services for rating system
-        builder.Services.AddSingleton<IAuthService, AuthService>();
-        builder.Services.AddSingleton<IRatingService, RatingService>();
     }
 
     public static void MapApi(this WebApplication app)
     {
-        // Add authentication/authorization middleware
-        app.UseAuthentication();
-        app.UseAuthorization();
-
-        // Map controllers
         app.MapControllers();
 
-        // Keep existing endpoints
         app.MapGet("/api/groups", (IScheduleService service, ILogger<Program> log) =>
         {
             log.LogInformation("GET /api/groups");
-            return Results.Json(service.GetGroups());
+            var groups = service.GetGroups().ToList();
+            return Results.Ok(new ListResponse<string>(groups));
         });
 
         app.MapGet("/api/rooms", (IScheduleService service, ILogger<Program> log) =>
         {
             log.LogInformation("GET /api/rooms");
-            return Results.Json(service.GetRooms());
+            var rooms = service.GetRooms().ToList();
+            return Results.Ok(new ListResponse<string>(rooms));
         });
 
         app.MapGet("/api/teachers", (IScheduleService service, ILogger<Program> log) =>
         {
             log.LogInformation("GET /api/teachers");
-            return Results.Json(service.GetTeachers());
-        });
-
-        app.MapGet("/api/schedule", (string groupName, string startDate, string endDate,
-                                     IScheduleService service, IMemoryCache cache, ILogger<Program> log) =>
-        {
-            if (string.IsNullOrWhiteSpace(groupName) ||
-                string.IsNullOrWhiteSpace(startDate) ||
-                string.IsNullOrWhiteSpace(endDate))
-            {
-                log.LogWarning("Missing parameters: group={Group}, start={Start}, end={End}",
-                    groupName, startDate, endDate);
-                return Results.BadRequest(new { error = "Missing required parameters" });
-            }
-
-            var key = $"sched:{groupName}:{startDate}:{endDate}";
-            if (!cache.TryGetValue(key, out var schedule))
-            {
-                try
-                {
-                    schedule = service.GetMergedScheduleForGroup(groupName, startDate, endDate);
-                    cache.Set(key, schedule, TimeSpan.FromHours(2));
-                    log.LogInformation("Fetched from DB & cached: {Key}", key);
-                }
-                catch (Exception ex)
-                {
-                    log.LogError(ex, "Error fetching schedule for {Group}", groupName);
-                    return Results.Json(new { error = "Internal server error" }, statusCode: 500);
-                }
-            }
-            else
-            {
-                log.LogInformation("Served from cache: {Key}", key);
-            }
-
-            return Results.Json(schedule);
+            var teachers = service.GetTeachers().ToList();
+            return Results.Ok(new ListResponse<string>(teachers));
         });
 
         app.MapGet("/api/teachers/validate", (string name, IScheduleService service, ILogger<Program> log) =>
@@ -217,7 +129,67 @@ static class StartupExtensions
 
             var exists = service.GetTeachers().Contains(name, StringComparer.OrdinalIgnoreCase);
             log.LogInformation("Validated teacher '{TeacherName}': {Exists}", name, exists);
-            return Results.Json(new { exists });
+            return Results.Ok(new { exists });
+        });
+
+        app.MapGet("/api/schedule",
+            (string groupName, string startDate, string endDate,
+             IScheduleService service, IMemoryCache cache, ILogger<Program> log) =>
+        {
+            if (string.IsNullOrWhiteSpace(groupName) ||
+                string.IsNullOrWhiteSpace(startDate)  ||
+                string.IsNullOrWhiteSpace(endDate))
+            {
+                log.LogWarning("Missing parameters: group={Group}, start={Start}, end={End}",
+                    groupName, startDate, endDate);
+                return Results.BadRequest(new { error = "groupName, startDate и endDate обязательны" });
+            }
+
+            if (!DateOnly.TryParseExact(startDate, "yyyy-MM-dd", out var parsedStart) ||
+                !DateOnly.TryParseExact(endDate,   "yyyy-MM-dd", out var parsedEnd))
+            {
+                return Results.BadRequest(new { error = "Даты должны быть в формате yyyy-MM-dd" });
+            }
+
+            if (parsedEnd < parsedStart)
+                return Results.BadRequest(new { error = "endDate не может быть раньше startDate" });
+
+            var cacheKey = $"sched:{groupName}:{startDate}:{endDate}";
+            List<CourseDto> lessons;
+
+            if (!cache.TryGetValue(cacheKey, out lessons))
+            {
+                try
+                {
+                    lessons = service.GetMergedScheduleForGroup(groupName, startDate, endDate).ToList();
+                    cache.Set(cacheKey, lessons, TimeSpan.FromHours(2));
+                    log.LogInformation("Fetched from DB & cached: {Key}", cacheKey);
+                }
+                catch (Exception ex)
+                {
+                    log.LogError(ex, "Error fetching schedule for {Group}", groupName);
+                    return Results.Json(new { error = "Внутренняя ошибка сервера" }, statusCode: 500);
+                }
+            }
+            else
+            {
+                log.LogInformation("Served from cache: {Key}", cacheKey);
+            }
+
+            if (lessons.Count == 0)
+                return Results.NoContent();
+
+            var weekStart = parsedStart.AddDays(-(int)parsedStart.DayOfWeek == 0 ? 6 : (int)parsedStart.DayOfWeek - 1);
+
+            var metadata = new ScheduleMetadata(
+                NextWeek:    weekStart.AddDays(7).ToString("yyyy-MM-dd"),
+                PrevWeek:    weekStart.AddDays(-7).ToString("yyyy-MM-dd"),
+                PeriodStart: startDate,
+                PeriodEnd:   endDate,
+                IsLastWeek:  false
+            );
+
+            return Results.Ok(new ApiResponse<CourseDto>(metadata, lessons));
         });
     }
 }
