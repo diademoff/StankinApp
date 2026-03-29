@@ -17,7 +17,7 @@ registerRoute(
     cacheName: 'api-cache',
     plugins: [
       new CacheableResponsePlugin({ statuses: [0, 200] }),
-      new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 60 * 60 }) // 1 час
+      new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 60 * 60 * 8 }) // 8 часов
     ],
   })
 );

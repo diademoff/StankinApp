@@ -4,25 +4,10 @@ import { Lesson } from '../../shared/types';
 import { ScheduleMemory } from '../../shared/scheduleMemory';
 import Swiper from 'swiper';
 import 'swiper/css';
-import { ApiClient } from '../../infra/api/ApiClient';
-
-interface TopComment {
-  id: number;
-  content: string;
-  votes: number;
-}
-
-interface RatingData {
-  id: number;
-  avg: number | '-'; // потому что у "Не указан" стоит '-'
-  count: number;
-  topComments: TopComment[];
-}
 
 export function scheduleComponent(
   groupName: string,
-  loadScheduleUseCase: LoadScheduleWeekUseCase,
-  api: ApiClient
+  loadScheduleUseCase: LoadScheduleWeekUseCase
 ) {
   const mem = new ScheduleMemory();
 
@@ -44,7 +29,6 @@ export function scheduleComponent(
     updating: false,
     isDiscussionModalOpen: false,
     selectedLessonForModal: null as Lesson | null,
-    teacherRatings: {} as Record<string, { avg: string | number; count: number }>,
 
     updateGroupedSchedule() {
       this.groupedSchedule = mem.asGroupedObject();
@@ -58,9 +42,7 @@ export function scheduleComponent(
       const days = DateUtils.rangeDays(weekStartDate, 7);
       for (const d of days) {
         const ds = DateUtils.toIsoDate(d);
-        if (!mem.hasDay(ds)) {
-          return false;
-        }
+        if (!mem.hasDay(ds)) return false;
       }
       return true;
     },
@@ -72,16 +54,13 @@ export function scheduleComponent(
       }
 
       const startApi = DateUtils.formatDateForApi(weekStartDate);
-      const endApi = DateUtils.formatDateForApi(DateUtils.addDays(weekStartDate, 6));
+      const endApi   = DateUtils.formatDateForApi(DateUtils.addDays(weekStartDate, 6));
 
       try {
-        if (direction === 'top') {
-          this.loadingTop = true;
-        } else if (direction === 'bottom') {
-          this.loadingBottom = true;
-        } else {
-          this.loading = true;
-        }
+        if (direction === 'top')         this.loadingTop    = true;
+        else if (direction === 'bottom') this.loadingBottom = true;
+        else                             this.loading       = true;
+
         this.loadingDir = direction;
         this.error = null;
 
@@ -102,23 +81,16 @@ export function scheduleComponent(
         mem.ensureDaysRange(weekStartDate, weekEnd);
 
         this.updateGroupedSchedule();
-        for (const lesson of lessons) {
-          if (lesson.teacher) {
-            this.fetchAndCacheTeacherRating(lesson.teacher);
-            this.ensureTeacherRating(lesson.teacher); // запускаем без await — фоновая загрузка
-          }
-        }
-
         return { lessons };
       } catch (e) {
         console.error('loadWeek error', e);
         this.error = 'Ошибка загрузки расписания.';
         throw e;
       } finally {
-        this.loading = false;
-        this.loadingTop = false;
+        this.loading       = false;
+        this.loadingTop    = false;
         this.loadingBottom = false;
-        this.loadingDir = null;
+        this.loadingDir    = null;
         this.initialLoadDone = true;
       }
     },
@@ -126,15 +98,15 @@ export function scheduleComponent(
     async loadMore(direction: 'top' | 'bottom') {
       if (direction === 'top') {
         if (this.loadingTop) return;
-        const earliest = mem.earliestDate();
-        let anchorDate = earliest ? new Date(earliest + 'T00:00:00') : DateUtils.startOfWeek(new Date());
+        const earliest   = mem.earliestDate();
+        const anchorDate = earliest ? new Date(earliest + 'T00:00:00') : DateUtils.startOfWeek(new Date());
         const newWeekStart = DateUtils.startOfWeek(DateUtils.addDays(anchorDate, -7));
 
         const container = (this as any).$refs?.scheduleContainer;
         let prevScrollHeight = 0, prevScrollTop = 0;
         if (container) {
           prevScrollHeight = container.scrollHeight;
-          prevScrollTop = container.scrollTop;
+          prevScrollTop    = container.scrollTop;
         }
 
         await this.loadWeek(newWeekStart, 'top');
@@ -145,8 +117,8 @@ export function scheduleComponent(
         }
       } else if (direction === 'bottom') {
         if (this.loadingBottom) return;
-        const latest = mem.latestDate();
-        let anchorDate = latest ? new Date(latest + 'T00:00:00') : DateUtils.startOfWeek(new Date());
+        const latest     = mem.latestDate();
+        const anchorDate = latest ? new Date(latest + 'T00:00:00') : DateUtils.startOfWeek(new Date());
         const newWeekStart = DateUtils.startOfWeek(DateUtils.addDays(anchorDate, 7));
         await this.loadWeek(newWeekStart, 'bottom');
       }
@@ -154,8 +126,8 @@ export function scheduleComponent(
 
     async onDateClick(dateStr: string) {
       try {
-        const clicked = new Date(dateStr + 'T00:00:00');
-        const weekStart = DateUtils.startOfWeek(clicked);
+        const clicked    = new Date(dateStr + 'T00:00:00');
+        const weekStart  = DateUtils.startOfWeek(clicked);
 
         if (!this.ensureWeekIsLoadedInMemory(weekStart)) {
           await this.loadWeek(weekStart, 'initial');
@@ -174,25 +146,20 @@ export function scheduleComponent(
 
       const tryScroll = async (attempt = 1): Promise<void> => {
         await new Promise(resolve => setTimeout(resolve, attemptDelay));
-
         const el = container.querySelector(`#date-${dateStr}`);
         if (!el) {
-          if (attempt < maxAttempts) {
-            return tryScroll(attempt + 1);
-          }
+          if (attempt < maxAttempts) return tryScroll(attempt + 1);
           return;
         }
-
         try {
           el.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
-        } catch (e) {
-          const top = el.offsetTop - container.offsetTop;
-          container.scrollTo({ top, behavior: 'smooth' });
+        } catch {
+          container.scrollTo({ top: el.offsetTop - container.offsetTop, behavior: 'smooth' });
         }
       };
 
       const clickedDate = new Date(dateStr + 'T00:00:00');
-      const weekStart = DateUtils.startOfWeek(clickedDate);
+      const weekStart   = DateUtils.startOfWeek(clickedDate);
       if (!this.ensureWeekIsLoadedInMemory(weekStart)) {
         await this.loadWeek(weekStart, 'initial');
         this.updateGroupedSchedule();
@@ -296,50 +263,40 @@ export function scheduleComponent(
       this.weekStart = DateUtils.startOfWeek(new Date());
 
       try {
-        // 1. Загружаем данные для текущей недели
         await this.loadWeek(this.weekStart, 'initial');
         this.updateGroupedSchedule();
 
-        // 2. Ждем, пока Alpine.js отрисует DOM
         await (this as any).$nextTick();
 
-        // 3. Мгновенно устанавливаем позицию прокрутки
         const container = (this as any).$refs.scheduleContainer;
         if (container) {
-          const todayStr = DateUtils.toIsoDate(new Date());
+          const todayStr     = DateUtils.toIsoDate(new Date());
           const todayElement = container.querySelector(`#date-${todayStr}`) as HTMLElement;
-
           if (todayElement) {
-            // Прямая установка scrollTop для мгновенного позиционирования
             container.scrollTop = todayElement.offsetTop;
           }
         }
 
-        // 4. Устанавливаем наблюдателей для бесконечной прокрутки
         this.setupObservers();
-
       } catch (e) {
         console.error('initial load failed', e);
       }
     },
 
-    formatDate(d: string) { return DateUtils.formatDateHuman(d); },
+    formatDate(d: string)      { return DateUtils.formatDateHuman(d); },
     formatDateShort(d: string) { return DateUtils.formatDateShort(d); },
-    formatTime(t: { hour: number; minute: number }) { return DateUtils.formatTime(t); },
-    calculateEndTime: DateUtils.calculateEndTime,
-
-    hasSchedule(dateStr: string) { return mem.hasDay(dateStr); },
+    hasSchedule(dateStr: string)  { return mem.hasDay(dateStr); },
     isSelectedDate(dateStr: string) { return dateStr === DateUtils.toIsoDate(new Date()); },
 
     lessonKey(date: string, l: Lesson) {
-      return `${date}-${l.subject}-${l.startTime?.hour ?? '00'}-${l.startTime?.minute ?? '00'}-${l.subgroup ?? ''}`;
+      return l.id ?? `${date}-${l.subject}-${l.startTime}-${l.subgroup ?? ''}`;
     },
 
     typeBadgeClass(typeRaw: string) {
       const t = (typeRaw || '').toLowerCase();
       if (t.includes('лекц')) return 'bg-blue-50 text-blue-700 ring-blue-200';
-      if (t.includes('лаб')) return 'bg-green-50 text-green-700 ring-green-200';
-      if (t.includes('сем')) return 'bg-purple-50 text-purple-700 ring-purple-200';
+      if (t.includes('лаб'))  return 'bg-green-50 text-green-700 ring-green-200';
+      if (t.includes('сем'))  return 'bg-purple-50 text-purple-700 ring-purple-200';
       return 'bg-gray-50 text-gray-700 ring-gray-200';
     },
 
@@ -348,7 +305,7 @@ export function scheduleComponent(
       return v.length ? v : 'кабинет не указан';
     },
 
-    formatSequence(pos: number, len: number, typeRaw: string) {
+    formatSequence(pos: number, len: number) {
       return `${pos} из ${len}`;
     },
 
@@ -356,79 +313,14 @@ export function scheduleComponent(
       this.disconnectObservers();
     },
 
-    async openDiscussionModal(lesson: Lesson) {
+    openDiscussionModal(lesson: Lesson) {
       if (!lesson.teacher) return;
       this.selectedLessonForModal = lesson;
       this.isDiscussionModalOpen = true;
-
-      // Гарантируем, что рейтинг загружен
-      await this.ensureTeacherRating(lesson.teacher);
-    },
-
-    async ensureTeacherRating(teacherName: string) {
-      if (!teacherName || this.teacherRatings[teacherName]) return;
-
-      try {
-        const result = await api.getTeacherRating(teacherName);
-        const data = result?.data;
-        this.teacherRatings[teacherName] = {
-          avg: data?.averageScore !== undefined ? data.averageScore.toFixed(1) : '–',
-          count: data?.ratingsCount || 0,
-        };
-      } catch (err) {
-        console.error('Failed to fetch rating for', teacherName, err);
-        this.teacherRatings[teacherName] = { avg: '–', count: 0 };
-      }
     },
 
     closeDiscussionModal() {
       this.isDiscussionModalOpen = false;
     },
-
-    getTeacherRating(teacherName: string) {
-      // Теперь используем api вместо прямого fetch
-      return api.getTeacherRating(teacherName)
-        .then(result => {
-          const data = result?.data;  // ApiClient возвращает { data: ... }, судя по вашему backend (ApiResponse<RatingAggregateResponse>)
-          return {
-            avg: data?.averageScore?.toFixed(1) || 'N/A',  // toFixed для формата, как в teacherDiscussionApp
-            count: data?.ratingsCount || 0
-          };
-        })
-        .catch(err => {
-          console.error('Error fetching rating:', err);
-          return { avg: 'N/A', count: 0 };
-        });
-    },
-
-    async fetchAndCacheTeacherRating(teacherName: string) {
-      if (!teacherName || this.teacherRatings[teacherName]) return;
-
-      try {
-        const result = await api.getTeacherRating(teacherName);
-        const data = result?.data;
-        this.teacherRatings[teacherName] = {
-          avg: data?.averageScore !== undefined ? data.averageScore.toFixed(1) : '–',
-          count: data?.ratingsCount || 0
-        };
-      } catch (err) {
-        console.error('Failed to fetch rating for', teacherName, err);
-        this.teacherRatings[teacherName] = { avg: '–', count: 0 };
-      }
-    },
-
-    getTopComments(teacherName: string) {
-      return fetch(`/api/teachers/${encodeURIComponent(teacherName)}/comments?page=1&limit=3`)
-        .then(res => res.json())
-        .then(data => data.comments.map((c: { id: number; content: string; votes: number; }) => ({
-          id: c.id as number,
-          content: c.content as string,
-          votes: c.votes as number
-        })) || [])
-        .catch(err => {
-          console.error('Error fetching comments:', err);
-          return [];
-        });
-    }
   };
 }

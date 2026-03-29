@@ -12,7 +12,7 @@ export class DateUtils {
   static startOfWeek(date: Date, weekStart = SCHEDULE_CONFIG.DEFAULT_WEEK_DAY_START): Date {
     const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     const day = d.getDay();
-    let diff = (day - weekStart + 7) % 7;
+    const diff = (day - weekStart + 7) % 7;
     d.setDate(d.getDate() - diff);
     d.setHours(0, 0, 0, 0);
     return d;
@@ -35,7 +35,10 @@ export class DateUtils {
   }
 
   static formatDateHuman(d: string): string {
-    const dateStr = new Date(d).toLocaleDateString('ru-RU', {
+    // Разбираем "2026-03-29" вручную, чтобы не зависеть от часового пояса
+    const [year, month, day] = d.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    const dateStr = date.toLocaleDateString('ru-RU', {
       weekday: 'long',
       day: 'numeric',
       month: 'long'
@@ -44,22 +47,9 @@ export class DateUtils {
   }
 
   static formatDateShort(d: string): string {
-    const x = new Date(d);
+    const [year, month, day] = d.split('-').map(Number);
+    const x = new Date(year, month - 1, day);
     const m = ['янв.', 'фев.', 'мар.', 'апр.', 'май', 'июн.', 'июл.', 'авг.', 'сен.', 'окт.', 'ноя.', 'дек.'];
     return `${x.getDate()} ${m[x.getMonth()]}`;
-  }
-
-  static formatTime(t: { hour: number; minute: number }): string {
-    const hh = String(t.hour).padStart(2, '0');
-    const mm = String(t.minute).padStart(2, '0');
-    return `${hh}:${mm}`;
-  }
-
-  static calculateEndTime(startTime: { hour: number; minute: number }, duration: { minutes: number }) {
-    const start = new Date();
-    start.setHours(startTime.hour, startTime.minute, 0, 0);
-    const endMs = start.getTime() + (duration.minutes || 0) * 60000;
-    const end = new Date(endMs);
-    return { hour: end.getHours(), minute: end.getMinutes() };
   }
 }
