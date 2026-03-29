@@ -9,6 +9,11 @@ public interface IScheduleService
     IEnumerable<string> GetGroups();
     IEnumerable<string> GetRooms();
     IEnumerable<string> GetTeachers();
+
+    /// <summary>
+    /// Возвращает плоский список занятий за период.
+    /// startDate / endDate — строки "yyyy-MM-dd".
+    /// </summary>
     IEnumerable<CourseDto> GetMergedScheduleForGroup(string groupName, string startDate, string endDate);
 }
 
@@ -17,18 +22,16 @@ public class ScheduleService : IScheduleService
     private readonly IDataReader _db;
     private const double MaxGapMinutes = 30;
 
-    public ScheduleService(IDataReader db)
-    {
-        _db = db;
-    }
+    public ScheduleService(IDataReader db) => _db = db;
 
-    public IEnumerable<string> GetGroups() => _db.GetGroups();
-    public IEnumerable<string> GetRooms() => _db.GetRooms();
+    public IEnumerable<string> GetGroups()   => _db.GetGroups();
+    public IEnumerable<string> GetRooms()    => _db.GetRooms();
     public IEnumerable<string> GetTeachers() => _db.GetTeachers();
 
-    public IEnumerable<CourseDto> GetMergedScheduleForGroup(string groupName, string startDate, string endDate)
+    public IEnumerable<CourseDto> GetMergedScheduleForGroup(
+        string groupName, string startDate, string endDate)
     {
-        var courses = _db.GetScheduleForGroup(groupName, startDate, endDate);
+        var courses   = _db.GetScheduleForGroup(groupName, startDate, endDate);
         var instances = new List<LessonInstance>();
 
         foreach (var c in courses)
@@ -36,32 +39,29 @@ public class ScheduleService : IScheduleService
             foreach (var d in c.Dates)
             {
                 var start = d.At(c.StartTime);
-                var end = start + c.Duration;
+                var end   = start + c.Duration;
 
                 instances.Add(new LessonInstance
                 {
-                    Start = start,
-                    End = end,
-                    Subject = c.Subject,
-                    Teacher = c.Teacher,
-                    Type = c.Type,
-                    Subgroup = c.Subgroup,
-                    Cabinet = c.Cabinet,
-                    GroupName = c.GroupName,
+                    Start            = start,
+                    End              = end,
+                    Subject          = c.Subject,
+                    Teacher          = c.Teacher,
+                    Type             = c.Type,
+                    Subgroup         = c.Subgroup,
+                    Cabinet          = c.Cabinet,
+                    GroupName        = c.GroupName,
                     SequencePosition = c.SequencePosition,
-                    SequenceLength = c.SequenceLength
+                    SequenceLength   = c.SequenceLength
                 });
             }
         }
 
-        var groupedByDate = instances.GroupBy(i => i.Start.Date);
         var mergedDtos = new List<CourseDto>();
 
-        foreach (var dayGroup in groupedByDate)
+        foreach (var dayGroup in instances.GroupBy(i => i.Start.Date))
         {
-            var subgroupGroups = dayGroup.GroupBy(i => i.Subgroup ?? string.Empty);
-
-            foreach (var subGroup in subgroupGroups)
+            foreach (var subGroup in dayGroup.GroupBy(i => i.Subgroup ?? string.Empty))
             {
                 var subInstances = subGroup.OrderBy(i => i.Start).ToList();
                 if (subInstances.Count == 0) continue;
@@ -70,66 +70,70 @@ public class ScheduleService : IScheduleService
                 for (int i = 1; i < subInstances.Count; i++)
                 {
                     var next = subInstances[i];
-                    var gap = (next.Start - current.End).ToDuration();
-                    if (gap >= Duration.Zero &&
+                    var gap  = (next.Start - current.End).ToDuration();
+
+                    bool canMerge =
+                        gap >= Duration.Zero &&
                         gap.TotalMinutes <= MaxGapMinutes &&
-                        current.Subject == next.Subject &&
-                        current.Teacher == next.Teacher &&
-                        current.Type == next.Type &&
+                        current.Subject  == next.Subject  &&
+                        current.Teacher  == next.Teacher  &&
+                        current.Type     == next.Type     &&
                         current.Subgroup == next.Subgroup &&
-                        current.Cabinet == next.Cabinet)
-                    {
+                        current.Cabinet  == next.Cabinet;
+
+                    if (canMerge)
                         current.End = next.End;
-                    }
                     else
                     {
-                        mergedDtos.Add(CreateDtoFromInstance(current));
+                        mergedDtos.Add(ToDto(current));
                         current = next;
                     }
                 }
-                mergedDtos.Add(CreateDtoFromInstance(current));
+                mergedDtos.Add(ToDto(current));
             }
         }
 
         return mergedDtos;
     }
 
-    private CourseDto CreateDtoFromInstance(LessonInstance i)
+    private static CourseDto ToDto(LessonInstance i)
     {
-        var duration = (i.End - i.Start).ToDuration();
-        var durationMinutes = (long)duration.TotalMinutes;
-        var dto = new CourseDto
-        {
-            StartTime = new SimpleTime(i.Start.Hour, i.Start.Minute),
-            Duration = new DurationType(durationMinutes),
-            Dates = new List<SimpleDate> { new SimpleDate(i.Start.Year, i.Start.Month, i.Start.Day) },
-            GroupName = i.GroupName,
-            Subject = i.Subject,
-            Teacher = i.Teacher,
-            Type = NormalizeType(i.Type),
-            Subgroup = i.Subgroup,
-            Cabinet = i.Cabinet,
-            SequencePosition = i.SequencePosition, // Copy from first; adjust if needed based on domain logic
-            SequenceLength = i.SequenceLength      // Copy from first; adjust if needed based on domain logic
-        };
-        return dto;
+        var dateStr     = $"{i.Start.Year:D4}-{i.Start.Month:D2}-{i.Start.Day:D2}";
+        var startStr    = $"{i.Start.Hour:D2}:{i.Start.Minute:D2}";
+        var endStr      = $"{i.End.Hour:D2}:{i.End.Minute:D2}";
+        var durationMin = (int)(i.End - i.Start).ToDuration().TotalMinutes;
+        var subgroupKey = string.IsNullOrEmpty(i.Subgroup) ? "all" : i.Subgroup;
+
+        // Уникальный id для Alpine x-for :key
+        var id = $"{i.GroupName}_{dateStr}_{startStr}_{subgroupKey}"
+                 .Replace(" ", "_");
+
+        return new CourseDto(
+            Id:               id,
+            Date:             dateStr,
+            StartTime:        startStr,
+            EndTime:          endStr,
+            DurationMinutes:  durationMin,
+            GroupName:        i.GroupName,
+            Subject:          i.Subject,
+            Teacher:          i.Teacher,
+            Type:             NormalizeType(i.Type),
+            Subgroup:         i.Subgroup ?? string.Empty,
+            Cabinet:          i.Cabinet,
+            SequencePosition: i.SequencePosition,
+            SequenceLength:   i.SequenceLength
+        );
     }
 
-    private string NormalizeType(string type)
+    private static string NormalizeType(string type) => type switch
     {
-        switch (type)
-        {
-            case "семинар":
-                return "Семинар";
-            case "лекции":
-                return "Лекция";
-            case "лабораторные занятия":
-                return "Лабораторная работа";
-            default:
-                return type;
-        }
-    }
+        "семинар"               => "Семинар",
+        "лекции"                => "Лекция",
+        "лабораторные занятия"  => "Лабораторная работа",
+        _                       => type
+    };
 }
+
 
 internal struct LessonInstance
 {
