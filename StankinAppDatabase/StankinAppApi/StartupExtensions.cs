@@ -1,10 +1,3 @@
-using Serilog;
-using StankinAppCore;
-using StankinAppApi.Dto;
-using Microsoft.Extensions.Caching.Memory;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -12,6 +5,10 @@ namespace StankinAppApi;
 
 static class StartupExtensions
 {
+    static string[] AvailableIp =
+    [
+      "stankinapp.ru"
+    ];
     public static void ConfigureLogging(this WebApplicationBuilder builder)
     {
         Log.Logger = new LoggerConfiguration()
