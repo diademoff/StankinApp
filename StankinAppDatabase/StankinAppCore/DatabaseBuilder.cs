@@ -104,6 +104,22 @@ public class DatabaseBuilder
             if (room is not null)
                 roomIds[room] = GetOrCreate(connection, "rooms", "name", room);
 
+        // Группируем курсы по (subject, teacher, lesson_type, subgroup)
+        // и считаем глобальное число дат для каждой группы
+        var courseKey = (Course c) => (c.Subject, c.Teacher, c.Type, c.Subgroup);
+
+        var globalSequenceLengths = courses
+            .GroupBy(courseKey)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Sum(c => c.Dates?.Count ?? 0)
+            );
+
+        // Счётчик уже вставленных дат для каждой группы курсов
+        var globalSequenceCounters = courses
+            .GroupBy(courseKey)
+            .ToDictionary(g => g.Key, _ => 0);
+
         foreach (var course in courses)
         {
             using var command = connection.CreateCommand();
@@ -135,9 +151,14 @@ public class DatabaseBuilder
 
             var lessonId = (long)(command.ExecuteScalar() ?? throw new NullReferenceException("lessonId is null"));
 
+            var key = courseKey(course);
+            var totalLength = globalSequenceLengths[key];
 
             for (int i = 0; i < course.Dates?.Count; i++)
             {
+                globalSequenceCounters[key]++;          // глобальная позиция
+                var globalPosition = globalSequenceCounters[key];
+
                 var date = course.Dates[i];
                 command.CommandText = @"
                         INSERT INTO schedule_dates (lesson_id, date, sequence_position, sequence_length)
@@ -146,8 +167,8 @@ public class DatabaseBuilder
                 command.Parameters.AddWithValue("@lesson_id", lessonId);
                 var dateParam = command.Parameters.Add("@date", SqliteType.Text);
                 dateParam.Value = new DateTime(currentYear, date.Month, date.Day).ToString("yyyy-MM-dd");
-                command.Parameters.AddWithValue("@sequence_position", i + 1);
-                command.Parameters.AddWithValue("@sequence_length", course.Dates?.Count);
+                command.Parameters.AddWithValue("@sequence_position", globalPosition);
+                command.Parameters.AddWithValue("@sequence_length", totalLength);
                 command.ExecuteNonQuery();
             }
         }
