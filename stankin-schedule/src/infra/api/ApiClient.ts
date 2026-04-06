@@ -30,11 +30,24 @@ export class ApiClient {
     return response?.items ?? [];
   }
 
+  async getTeachers(): Promise<string[]> {
+    const url = `${this.base}/api/teachers`;
+    const response = await this.fetchJson(url);
+    return response?.items ?? [];
+  }
+
   async getSchedule(group: string, startDate: string, endDate: string): Promise<any[]> {
     const params = new URLSearchParams({ groupName: group, startDate, endDate });
     const url = `${this.base}/api/schedule?${params.toString()}`;
     const response = await this.fetchJson(url);
     // 204 → null → пустой массив
+    return response?.items ?? [];
+  }
+
+  async getTeacherSchedule(teacherName: string, startDate: string, endDate: string): Promise<any[]> {
+    const params = new URLSearchParams({ teacherName, startDate, endDate });
+    const url = `${this.base}/api/schedule/teacher?${params.toString()}`;
+    const response = await this.fetchJson(url);
     return response?.items ?? [];
   }
 }

@@ -1,5 +1,13 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Caching.Memory;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
+using Serilog;
+using StankinAppApi.Dto;
+using StankinAppCore;
 
 namespace StankinAppApi;
 
@@ -187,6 +195,52 @@ static class StartupExtensions
             );
 
             return Results.Ok(new ApiResponse<CourseDto>(metadata, lessons));
+        });
+
+
+       app.MapGet("/api/schedule/teacher", (
+            string teacherName,
+            string startDate,
+            string endDate,
+            IDataReader reader) =>
+        {
+            try
+            {
+                var courses = reader.GetScheduleForTeacher(teacherName, startDate, endDate);
+
+                if (!courses.Any()) return Results.NoContent();
+
+                var dtos = courses.Select(c => new CourseDto(
+                    Id: $"{c.GroupName}_{c.Dates[0].ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}_{c.StartTime.ToString("HH:mm", CultureInfo.InvariantCulture)}_{c.Subgroup ?? "all"}",
+                    Date: c.Dates[0].ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+                    StartTime: c.StartTime.ToString("HH:mm", CultureInfo.InvariantCulture),
+                    EndTime: (c.StartTime + c.Duration).ToString("HH:mm", CultureInfo.InvariantCulture),
+                    DurationMinutes: (int)c.Duration.ToDuration().TotalMinutes,
+                    GroupName: c.GroupName,
+                    Subject: c.Subject,
+                    Teacher: c.Teacher,
+                    Type: c.Type,
+                    Subgroup: c.Subgroup ?? "",
+                    Cabinet: c.Cabinet ?? "",
+                    SequencePosition: c.SequencePosition,
+                    SequenceLength: c.SequenceLength
+                ));
+
+                var start = DateTime.ParseExact(startDate, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+                var metadata = new ScheduleMetadata(
+                    NextWeek: start.AddDays(7).ToString("yyyy-MM-dd"),
+                    PrevWeek: start.AddDays(-7).ToString("yyyy-MM-dd"),
+                    PeriodStart: startDate,
+                    PeriodEnd: endDate,
+                    IsLastWeek: false
+                );
+
+                return Results.Ok(new ApiResponse<CourseDto>(metadata, dtos));
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(ex.Message);
+            }
         });
     }
 }

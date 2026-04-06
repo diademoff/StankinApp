@@ -15,4 +15,14 @@ export class HttpGroupRepository implements GroupRepository {
     this.cache.set(key, groups);
     return groups;
   }
+
+  async fetchTeachers(): Promise<string[]> {
+    const key = this.cache.buildKey('teachers');
+    const cached = this.cache.get(key, SCHEDULE_CONFIG.CACHE_TTL_MS / 2);
+    if (cached) return cached;
+
+    const teachers = await this.api.getTeachers();
+    this.cache.set(key, teachers);
+    return teachers;
+  }
 }

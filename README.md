@@ -260,9 +260,10 @@ docker compose up -d --build
 | GET   | `/api/rooms`             | Список аудиторий                     |
 | GET   | `/api/teachers`          | Список преподавателей                |
 | GET   | `/api/schedule`          | Расписание группы за период          |
+| GET   | `/api/schedule/teacher`  | Расписание преподавателя за период   |
 | GET   | `/api/teachers/validate` | Проверка существования преподавателя |
 
-**Параметры `/api/schedule`:**
+**Параметры `/api/schedule` (Группы):**
 
 | Параметр | Тип | Пример |
 |----------|-----|--------|
@@ -270,7 +271,15 @@ docker compose up -d --build
 | `startDate` | string (ISO) | `2026-03-29` |
 | `endDate` | string (ISO) | `2026-04-04` |
 
-**Формат ответа `/api/schedule`:**
+**Параметры `/api/schedule/teacher` (Преподаватели):**
+
+| Параметр | Тип | Пример |
+|----------|-----|--------|
+| `teacherName` | string | `Иванов И.И.` |
+| `startDate` | string (ISO) | `2026-03-29` |
+| `endDate` | string (ISO) | `2026-04-04` |
+
+**Формат ответа (единый для всех эндпоинтов расписания):**
 
 ```json
 {
@@ -290,6 +299,7 @@ docker compose up -d --build
       "durationMinutes": 90,
       "subject": "Математика",
       "teacher": "Иванов И.И.",
+      "groupName": "АДБ-23-04",
       "type": "Лекция",
       "cabinet": "А-101",
       "subgroup": "",

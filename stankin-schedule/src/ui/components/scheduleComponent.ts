@@ -1,4 +1,5 @@
 import { LoadScheduleWeekUseCase } from '../../core/use-cases/LoadScheduleWeekUseCase';
+import { LoadTeacherScheduleWeekUseCase } from '../../core/use-cases/LoadTeacherScheduleWeekUseCase';
 import { DateUtils } from '../../shared/date-utils';
 import { Lesson } from '../../shared/types';
 import { ScheduleMemory } from '../../shared/scheduleMemory';
@@ -6,13 +7,16 @@ import Swiper from 'swiper';
 import 'swiper/css';
 
 export function scheduleComponent(
-  groupName: string,
-  loadScheduleUseCase: LoadScheduleWeekUseCase
+  subjectName: string,
+  viewMode: 'group' | 'teacher',
+  loadScheduleUseCase: LoadScheduleWeekUseCase,
+  loadTeacherScheduleUseCase: LoadTeacherScheduleWeekUseCase
 ) {
   const mem = new ScheduleMemory();
 
   return {
-    groupName,
+    subjectName,
+    viewMode,
     loading: false,
     loadingDir: null as 'top' | 'bottom' | 'initial' | null,
     error: null as string | null,
@@ -48,8 +52,8 @@ export function scheduleComponent(
     },
 
     async loadWeek(weekStartDate: Date, direction: 'top' | 'bottom' | 'initial' = 'bottom') {
-      if (!this.groupName || !weekStartDate) {
-        this.error = 'Не указана группа или дата';
+      if (!this.subjectName || !weekStartDate) {
+        this.error = 'Не указана группа/преподаватель или дата';
         return;
       }
 
@@ -64,7 +68,12 @@ export function scheduleComponent(
         this.loadingDir = direction;
         this.error = null;
 
-        const lessons = await loadScheduleUseCase.execute(this.groupName, startApi, endApi);
+        let lessons: Lesson[];
+        if (this.viewMode === 'teacher') {
+          lessons = await loadTeacherScheduleUseCase.execute(this.subjectName, startApi, endApi);
+        } else {
+          lessons = await loadScheduleUseCase.execute(this.subjectName, startApi, endApi);
+        }
 
         const days = DateUtils.rangeDays(weekStartDate, 7);
         for (const d of days) {
@@ -314,7 +323,6 @@ export function scheduleComponent(
     },
 
     openDiscussionModal(lesson: Lesson) {
-      if (!lesson.teacher) return;
       this.selectedLessonForModal = lesson;
       this.isDiscussionModalOpen = true;
     },

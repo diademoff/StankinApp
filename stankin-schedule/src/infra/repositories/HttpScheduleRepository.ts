@@ -17,6 +17,17 @@ export class HttpScheduleRepository implements ScheduleRepository {
     return lessons;
   }
 
+  async fetchTeacherWeek(teacherName: string, startDate: string, endDate: string): Promise<Lesson[]> {
+    const key = this.cache.buildKey('schedule_teacher', teacherName, `${startDate}_${endDate}`);
+    const cached = this.cache.get(key);
+    if (cached) return cached;
+
+    const items = await this.api.getTeacherSchedule(teacherName, startDate, endDate);
+    const lessons = this.mapToLessons(items);
+    this.cache.set(key, lessons);
+    return lessons;
+  }
+
   private mapToLessons(items: any[]): Lesson[] {
     return (items || []).map(it => ({
       id:               it.id,

@@ -26,119 +26,253 @@
     <div><img src="https://mc.yandex.ru/watch/103946021" style="position:absolute; left:-9999px;" alt="" /></div>
   </noscript>
   <!-- /Yandex.Metrika counter -->
+
   <div class="flex-1 min-h-0 flex flex-col max-w-xl mx-auto w-full py-10 px-4">
-    <!-- Выбор группы -->
-    <template x-if="!selectedGroup">
-      <div x-data="{
-        selectedYear: null,
-        selectedAbbr: null,
-        get groupedGroups() {
-            const result = {};
-            const groups = this.groups || [];
-            for (const g of groups) {
-                const match = g.match(/-(\d{2})-/);
-                if (!match) continue;
-                const key = match[1];
-                if (!result[key]) result[key] = [];
-                result[key].push(g);
-            }
-            return result;
-        },
-        get years() {
-            return Object.keys(this.groupedGroups).sort((a, b) => parseInt(b) - parseInt(a));
-        },
-        get abbrevs() {
-            if (!this.selectedYear) return [];
-            const groupsInYear = this.groupedGroups[this.selectedYear] || [];
-            const abbrSet = new Set(groupsInYear.map(g => g.split('-')[0]));
-            return Array.from(abbrSet).sort();
-        },
-        get filteredGroups() {
-            if (!this.selectedYear || !this.selectedAbbr) return [];
-            const prefix = `${this.selectedAbbr}-${this.selectedYear}-`;
-            return (this.groupedGroups[this.selectedYear] || [])
-                .filter(g => g.startsWith(prefix))
-                .sort();
-        }
-    }" class="flex flex-col min-h-0 flex-1">
-        <h1 class="text-2xl font-bold mb-4">Выберите группу</h1>
 
-        <template x-if="!groups || groups.length === 0">
-          <p>Загрузка групп...</p>
-        </template>
+    <!-- ======================================================
+         PICKER: выбор группы / преподавателя (модалка поверх)
+         ====================================================== -->
+    <template x-if="showPicker">
+      <div class="fixed inset-0 bg-black bg-opacity-40 z-50 flex items-end sm:items-center justify-center p-4"
+           @click.self="closePicker()">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[85vh]">
 
-        <template x-if="groups && groups.length > 0">
-          <div class="flex flex-col min-h-0 flex-1">
-            <!-- Шаг 1: Год -->
-            <template x-if="!selectedYear">
-              <div class="flex-1">
-                <h2 class="text-xl font-semibold mb-2">Выберите год поступления</h2>
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                  <template x-for="year in years" :key="year">
-                    <button @click="selectedYear = year"
-                      class="bg-white shadow hover:shadow-lg rounded-xl p-4 text-center text-sm font-medium transition-all duration-150 hover:bg-blue-50 active:scale-95">
-                      <span x-text="`20${year}г`"></span>
-                    </button>
-                  </template>
-                </div>
-              </div>
-            </template>
-
-            <template x-if="selectedYear && !selectedAbbr">
-              <div class="flex-1">
-                <div class="flex items-center mb-4">
-                  <button @click="selectedYear = null" class="text-blue-500 hover:underline mr-2">&lt; Назад</button>
-                  <h2 class="text-xl font-semibold">Выберите аббревиатуру для 20<span x-text="selectedYear"></span>г
-                  </h2>
-                </div>
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                  <template x-for="abbr in abbrevs" :key="abbr">
-                    <button @click="selectedAbbr = abbr"
-                      class="bg-white shadow hover:shadow-lg rounded-xl p-4 text-center text-sm font-medium transition-all duration-150 hover:bg-blue-50 active:scale-95">
-                      <span x-text="abbr"></span>
-                    </button>
-                  </template>
-                </div>
-              </div>
-            </template>
-
-            <!-- Шаг 3: Конкретная группа -->
-            <template x-if="selectedYear && selectedAbbr">
-              <div class="flex-1">
-                <div class="flex items-center mb-4">
-                  <button @click="selectedAbbr = null" class="text-blue-500 hover:underline mr-2">&lt; Назад</button>
-                  <h2 class="text-xl font-semibold">
-                    Выберите группу для <span x-text="selectedAbbr"></span> в 20<span x-text="selectedYear"></span>г
-                  </h2>
-                </div>
-                <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                  <template x-for="group in filteredGroups" :key="group">
-                    <button @click="selectGroup(group)"
-                      class="bg-white shadow hover:shadow-lg rounded-xl p-4 text-center text-sm font-medium transition-all duration-150 hover:bg-blue-50 active:scale-95">
-                      <span x-text="group"></span>
-                    </button>
-                  </template>
-                </div>
-              </div>
-            </template>
+          <!-- Шапка пикера -->
+          <div class="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-100 shrink-0">
+            <h2 class="text-lg font-semibold">Выбор расписания</h2>
+            <button @click="closePicker()"
+              class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition">✕</button>
           </div>
-        </template>
+
+          <!-- Переключатель режима -->
+          <div class="px-4 pt-3 pb-2 shrink-0">
+            <div class="flex gap-2 bg-gray-100 rounded-xl p-1">
+              <button
+                @click="switchMode('group')"
+                class="flex-1 py-2 rounded-lg text-sm font-medium transition"
+                :class="viewMode === 'group' ? 'bg-white shadow text-blue-700' : 'text-gray-600 hover:text-gray-800'">
+                👥 Группа
+              </button>
+              <button
+                @click="switchMode('teacher')"
+                class="flex-1 py-2 rounded-lg text-sm font-medium transition"
+                :class="viewMode === 'teacher' ? 'bg-white shadow text-blue-700' : 'text-gray-600 hover:text-gray-800'">
+                🎓 Преподаватель
+              </button>
+            </div>
+          </div>
+
+          <!-- Режим: ПРЕПОДАВАТЕЛЬ -->
+          <template x-if="viewMode === 'teacher'">
+            <div class="flex flex-col min-h-0 flex-1 px-4 pb-4">
+              <!-- Поисковая строка -->
+              <div class="relative mb-3 shrink-0">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">🔍</span>
+                <input
+                  type="text"
+                  x-model="teacherSearch"
+                  placeholder="Поиск преподавателя..."
+                  class="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
+                  x-ref="teacherSearchInput"
+                  x-init="$nextTick(() => $refs.teacherSearchInput?.focus())"
+                />
+              </div>
+
+              <!-- Список преподавателей -->
+              <div class="overflow-y-auto flex-1 space-y-1 -mx-1 px-1">
+                <template x-if="loadingTeachers">
+                  <p class="text-center text-gray-500 py-4 text-sm">Загрузка списка...</p>
+                </template>
+                <template x-if="!loadingTeachers && filteredTeachers.length === 0">
+                  <p class="text-center text-gray-500 py-4 text-sm">Преподаватель не найден</p>
+                </template>
+                <template x-for="teacher in filteredTeachers" :key="teacher">
+                  <button
+                    @click="selectTeacher(teacher)"
+                    class="w-full text-left px-3 py-2.5 rounded-xl text-sm font-medium transition hover:bg-blue-50 hover:text-blue-700 active:scale-[0.98]"
+                    :class="selectedTeacher === teacher ? 'bg-blue-50 text-blue-700 ring-1 ring-blue-200' : 'text-gray-800'">
+                    <span x-text="teacher"></span>
+                  </button>
+                </template>
+              </div>
+            </div>
+          </template>
+
+          <!-- Режим: ГРУППА -->
+          <template x-if="viewMode === 'group'">
+            <div x-data="{
+              selectedYear: null,
+              selectedAbbr: null,
+              get groupedGroups() {
+                const result = {};
+                const groups = $store ? [] : (window._schedAppGroups || []);
+                // fallback: берём из родительского контекста через closure
+                return result;
+              }
+            }" class="flex flex-col min-h-0 flex-1 px-4 pb-4">
+              <!-- Используем groups из scheduleApp через Alpine scope -->
+              <div x-data="{
+                selectedYear: null,
+                selectedAbbr: null,
+                get groupedGroups() {
+                  const result = {};
+                  for (const g of (groups || [])) {
+                    const match = g.match(/-(\d{2})-/);
+                    if (!match) continue;
+                    const key = match[1];
+                    if (!result[key]) result[key] = [];
+                    result[key].push(g);
+                  }
+                  return result;
+                },
+                get years() {
+                  return Object.keys(this.groupedGroups).sort((a, b) => parseInt(b) - parseInt(a));
+                },
+                get abbrevs() {
+                  if (!this.selectedYear) return [];
+                  const groupsInYear = this.groupedGroups[this.selectedYear] || [];
+                  const abbrSet = new Set(groupsInYear.map(g => g.split('-')[0]));
+                  return Array.from(abbrSet).sort();
+                },
+                get filteredGroups() {
+                  if (!this.selectedYear || !this.selectedAbbr) return [];
+                  const prefix = `${this.selectedAbbr}-${this.selectedYear}-`;
+                  return (this.groupedGroups[this.selectedYear] || [])
+                    .filter(g => g.startsWith(prefix))
+                    .sort();
+                }
+              }" class="flex flex-col min-h-0 flex-1 overflow-y-auto">
+
+                <template x-if="!groups || groups.length === 0">
+                  <p class="text-center text-gray-500 py-4 text-sm">Загрузка групп...</p>
+                </template>
+
+                <!-- Шаг 1: Год -->
+                <template x-if="groups && groups.length > 0 && !selectedYear">
+                  <div>
+                    <p class="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">Год поступления</p>
+                    <div class="grid grid-cols-3 gap-2">
+                      <template x-for="year in years" :key="year">
+                        <button @click="selectedYear = year"
+                          class="bg-gray-50 hover:bg-blue-50 hover:text-blue-700 border border-gray-200 rounded-xl p-3 text-sm font-medium transition active:scale-95">
+                          <span x-text="`20${year}г`"></span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Шаг 2: Аббревиатура -->
+                <template x-if="groups && groups.length > 0 && selectedYear && !selectedAbbr">
+                  <div>
+                    <button @click="selectedYear = null" class="text-blue-500 text-sm mb-3 hover:underline">&lt; Назад</button>
+                    <p class="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">
+                      Аббревиатура для 20<span x-text="selectedYear"></span>г
+                    </p>
+                    <div class="grid grid-cols-3 gap-2">
+                      <template x-for="abbr in abbrevs" :key="abbr">
+                        <button @click="selectedAbbr = abbr"
+                          class="bg-gray-50 hover:bg-blue-50 hover:text-blue-700 border border-gray-200 rounded-xl p-3 text-sm font-medium transition active:scale-95">
+                          <span x-text="abbr"></span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- Шаг 3: Группа -->
+                <template x-if="groups && groups.length > 0 && selectedYear && selectedAbbr">
+                  <div>
+                    <button @click="selectedAbbr = null" class="text-blue-500 text-sm mb-3 hover:underline">&lt; Назад</button>
+                    <p class="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">
+                      Группа: <span x-text="selectedAbbr"></span>-20<span x-text="selectedYear"></span>
+                    </p>
+                    <div class="grid grid-cols-2 gap-2">
+                      <template x-for="group in filteredGroups" :key="group">
+                        <button @click="selectGroup(group)"
+                          class="bg-gray-50 hover:bg-blue-50 hover:text-blue-700 border border-gray-200 rounded-xl p-3 text-sm font-medium transition active:scale-95"
+                          :class="selectedGroup === group ? 'bg-blue-50 text-blue-700 border-blue-200 ring-1 ring-blue-200' : ''">
+                          <span x-text="group"></span>
+                        </button>
+                      </template>
+                    </div>
+                  </div>
+                </template>
+
+              </div>
+            </div>
+          </template>
+
+        </div>
       </div>
     </template>
 
-    <!-- Расписание -->
-    <template x-if="selectedGroup">
+    <!-- ======================================================
+         ЭКРАН: нет выбора — показываем кнопки начального входа
+         ====================================================== -->
+    <template x-if="!hasSelection && !showPicker">
+      <div class="flex flex-col items-center justify-center flex-1 gap-6">
+        <div class="text-center">
+          <h1 class="text-2xl font-bold mb-1">Расписание МГТУ Станкин</h1>
+          <p class="text-gray-500 text-sm">Выберите режим просмотра</p>
+        </div>
+        <div class="flex flex-col gap-3 w-full max-w-xs">
+          <button
+            @click="switchMode('group'); openPicker()"
+            class="flex items-center gap-3 bg-white shadow hover:shadow-md rounded-2xl p-4 text-left transition active:scale-[0.98]">
+            <span class="text-2xl">👥</span>
+            <div>
+              <div class="font-semibold">По группе</div>
+              <div class="text-xs text-gray-500">Выберите учебную группу</div>
+            </div>
+          </button>
+          <button
+            @click="switchMode('teacher'); openPicker()"
+            class="flex items-center gap-3 bg-white shadow hover:shadow-md rounded-2xl p-4 text-left transition active:scale-[0.98]">
+            <span class="text-2xl">🎓</span>
+            <div>
+              <div class="font-semibold">По преподавателю</div>
+              <div class="text-xs text-gray-500">Найдите расписание преподавателя</div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </template>
+
+    <!-- ======================================================
+         РАСПИСАНИЕ
+         ====================================================== -->
+    <template x-if="hasSelection">
       <div class="flex flex-col min-h-0 flex-1">
+
+        <!-- Заголовок с кнопкой ✎ и меткой режима -->
         <div class="flex items-center justify-between mb-2">
-          <h1 class="text-xl font-semibold">
-            <button @click="reset()" class="mr-2 text-lg">✎</button>
-            <span x-text="selectedGroup"></span>
+          <h1 class="text-xl font-semibold flex items-center gap-2 min-w-0">
+            <!-- Кнопка ✎ открывает пикер -->
+            <button
+              @click="openPicker()"
+              class="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-200 text-gray-600 transition text-base"
+              title="Изменить группу / преподавателя">✎</button>
+            <span class="truncate" x-text="displayTitle"></span>
+            <!-- Бейдж режима -->
+            <span class="shrink-0 text-xs px-2 py-0.5 rounded-full font-medium"
+              :class="viewMode === 'teacher' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'"
+              x-text="viewMode === 'teacher' ? '🎓 Преп.' : '👥 Группа'"></span>
           </h1>
           <a href="https://lk.stankin.ru"
-            class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-700 shadow-sm hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+            class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-700 shadow-sm hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 shrink-0"
             aria-label="Посмотреть оценки">📊</a>
         </div>
-        <div x-data="scheduleComponent(selectedGroup)" x-init="init()" class="flex flex-col min-h-0 flex-1">
+
+        <!-- Компонент расписания -->
+        <div
+          x-data="scheduleComponent(
+            viewMode === 'teacher' ? selectedTeacher : selectedGroup,
+            viewMode
+          )"
+          x-init="init()"
+          class="flex flex-col min-h-0 flex-1">
+
           <!-- Swiper с датами -->
           <div class="flex items-center justify-between mb-4">
             <div class="swiper w-full" x-ref="swiper">
@@ -163,8 +297,7 @@
 
           <!-- Контент расписания -->
           <div x-ref="scheduleContainer" class="flex-1 min-h-0 overflow-y-auto">
-            <div x-show="loading && loadingDir === 'top'" class="text-gray-600 text-center py-2">Загрузка расписания...
-            </div>
+            <div x-show="loading && loadingDir === 'top'" class="text-gray-600 text-center py-2">Загрузка расписания...</div>
             <div x-ref="loadMoreTop"></div>
 
             <template x-if="!loading && isEmptySchedule && !error">
@@ -186,6 +319,7 @@
                     <div @click="openDiscussionModal(lesson)"
                       class="group relative rounded-2xl bg-white shadow-sm ring-1 ring-gray-200 p-4 hover:shadow-md focus-within:ring-2 focus-within:ring-blue-400 transition"
                       :aria-label="`Занятие: ${lesson.subject}`">
+
                       <!-- Предмет + время -->
                       <div class="flex items-start justify-between gap-3">
                         <h3 class="text-lg sm:text-xl font-semibold tracking-tight leading-snug"
@@ -199,8 +333,7 @@
 
                       <!-- Тип + кабинет + порядковый номер -->
                       <div class="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                        <span
-                          class="inline-block rounded-md bg-gray-50 ring-1 ring-gray-200 px-2 py-1 text-sm font-medium"
+                        <span class="inline-block rounded-md bg-gray-50 ring-1 ring-gray-200 px-2 py-1 text-sm font-medium"
                           x-text="formatCabinet(lesson.cabinet)"></span>
                         <span class="inline-flex items-center rounded-full px-2 py-1 ring-1 font-medium"
                           :class="typeBadgeClass(lesson.type)" x-text="lesson.type"></span>
@@ -215,9 +348,16 @@
                         </template>
                       </div>
 
-                      <!-- Преподаватель -->
+                      <!-- Нижняя строка: преподаватель (режим группы) или группа (режим преподавателя) -->
                       <div class="mt-2 text-sm text-gray-800">
-                        <span x-text="'🎓 ' + (lesson.teacher || 'Не указан')"></span>
+                        <!-- В режиме группы показываем преподавателя -->
+                        <template x-if="viewMode === 'group'">
+                          <span x-text="'🎓 ' + (lesson.teacher || 'Не указан')"></span>
+                        </template>
+                        <!-- В режиме преподавателя показываем группу -->
+                        <template x-if="viewMode === 'teacher'">
+                          <span x-text="'👥 ' + (lesson.groupName || 'Группа не указана')"></span>
+                        </template>
                       </div>
                     </div>
                   </template>
@@ -228,25 +368,29 @@
             <div x-ref="loadMoreBottom"></div>
             <div x-show="loading && loadingDir === 'bottom'" class="text-gray-600 text-center py-2">⏳ Загрузка...</div>
 
-            <!-- Модал преподавателя (без рейтинга и комментариев) -->
+            <!-- Модал деталей занятия -->
             <template x-if="isDiscussionModalOpen">
               <div @click="closeDiscussionModal()"
                 class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[100] overflow-y-auto">
                 <div @click.stop class="bg-white rounded-2xl shadow-lg p-6 w-full max-w-md space-y-4">
                   <div class="text-center">
-                    <h2 class="text-xl font-bold" x-text="selectedLessonForModal?.teacher || 'Преподаватель не указан'">
-                    </h2>
+                    <h2 class="text-xl font-bold" x-text="selectedLessonForModal?.subject"></h2>
+                    <p class="text-sm text-gray-500 mt-1" x-text="selectedLessonForModal?.type"></p>
                   </div>
 
                   <div class="space-y-2 text-sm text-gray-700">
-                    <p><span class="font-medium">Предмет:</span> <span x-text="selectedLessonForModal?.subject"></span></p>
-                    <p><span class="font-medium">Тип:</span> <span x-text="selectedLessonForModal?.type"></span></p>
-                    <p><span class="font-medium">Кабинет:</span> <span x-text="formatCabinet(selectedLessonForModal?.cabinet)"></span></p>
+                    <p><span class="font-medium">🎓 Преподаватель:</span>
+                      <span x-text="selectedLessonForModal?.teacher || 'Не указан'"></span></p>
+                    <p><span class="font-medium">👥 Группа:</span>
+                      <span x-text="selectedLessonForModal?.groupName || 'Не указана'"></span></p>
+                    <p><span class="font-medium">Кабинет:</span>
+                      <span x-text="formatCabinet(selectedLessonForModal?.cabinet)"></span></p>
                     <p><span class="font-medium">Время:</span>
                       <span x-text="`${selectedLessonForModal?.startTime} – ${selectedLessonForModal?.endTime}`"></span>
                     </p>
                     <template x-if="selectedLessonForModal?.subgroup">
-                      <p><span class="font-medium">Подгруппа:</span> <span x-text="selectedLessonForModal?.subgroup"></span></p>
+                      <p><span class="font-medium">Подгруппа:</span>
+                        <span x-text="selectedLessonForModal?.subgroup"></span></p>
                     </template>
                   </div>
 
