@@ -10,8 +10,8 @@ import { LoadTeachersUseCase } from './core/use-cases/LoadTeachersUseCase';
 import { scheduleApp } from './ui/pages/scheduleApp';
 import { scheduleComponent } from './ui/components/scheduleComponent';
 
-//const api = new ApiClient('http://localhost:5000'); // debug only
-const api   = new ApiClient('');
+const api = new ApiClient('http://localhost:5000'); // debug only
+// const api   = new ApiClient('');
 const cache = new LocalStorageCache();
 
 const groupRepo    = new HttpGroupRepository(api, cache);

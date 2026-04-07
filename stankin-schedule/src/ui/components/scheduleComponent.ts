@@ -35,7 +35,34 @@ export function scheduleComponent(
     selectedLessonForModal: null as Lesson | null,
 
     updateGroupedSchedule() {
-      this.groupedSchedule = mem.asGroupedObject();
+      const raw = mem.asGroupedObject();
+
+      if (this.viewMode === 'teacher') {
+        // Объединяем пары с одинаковым предметом, кабинетом и временем начала
+        const merged: Record<string, Lesson[]> = {};
+        for (const [date, lessons] of Object.entries(raw)) {
+          const map = new Map<string, Lesson>();
+          for (const l of lessons) {
+            const key = l.startTime + '|' + l.subject + '|' + (l.cabinet ?? '');
+            if (map.has(key)) {
+              const existing = map.get(key)!;
+              if (existing.groupName && l.groupName && !existing.groupName.includes(l.groupName)) {
+                const groups = existing.groupName.split(', ');
+                groups.push(l.groupName);
+                groups.sort();
+                existing.groupName = groups.join(', ');
+              }
+            } else {
+              map.set(key, { ...l });
+            }
+          }
+          merged[date] = Array.from(map.values());
+        }
+        this.groupedSchedule = merged;
+      } else {
+        this.groupedSchedule = raw;
+      }
+
       this.isEmptySchedule = Object.keys(this.groupedSchedule).every(
         date => this.groupedSchedule[date].length === 0
       );
@@ -163,7 +190,8 @@ export function scheduleComponent(
         try {
           el.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
         } catch {
-          container.scrollTo({ top: el.offsetTop - container.offsetTop, behavior: 'smooth' });
+          const offset = el.getBoundingClientRect().top - container.getBoundingClientRect().top + container.scrollTop - 8;
+          container.scrollTo({ top: offset, behavior: 'smooth' });
         }
       };
 
@@ -282,7 +310,13 @@ export function scheduleComponent(
           const todayStr     = DateUtils.toIsoDate(new Date());
           const todayElement = container.querySelector(`#date-${todayStr}`) as HTMLElement;
           if (todayElement) {
-            container.scrollTop = todayElement.offsetTop;
+            // вычитаем offsetTop контейнера и добавляем отступ 8px,
+            // чтобы заголовок даты не прятался под карусель с датами
+            const offset = todayElement.getBoundingClientRect().top
+              - container.getBoundingClientRect().top
+              + container.scrollTop
+              - 8;
+            container.scrollTop = offset;
           }
         }
 
