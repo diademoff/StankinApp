@@ -138,6 +138,8 @@ namespace StankinAppDatabase
             {
                 if (throwOnFail)
                     throw new Exception("Parsing failed");
+                if (parseError is null)
+                    return entries;
                 return [.. parseError(new ErrorParsingInfo()
                 {
                     LineToParse = lessonLine,
