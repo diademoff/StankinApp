@@ -91,26 +91,62 @@ public class DatabaseBuilder
 
         var groupId = GetOrCreate(connection, "groups", "name", groupName);
 
-        var teachers = courses.Select(c => c.Teacher).Distinct().ToList();
+        var teachers = courses.Select(c => c.Teacher).Where(t => t != null).Distinct().ToList();
         var rooms = courses.Select(c => c.Cabinet).Where(c => !string.IsNullOrEmpty(c)).Distinct().ToList();
 
         var teacherIds = new Dictionary<string, long>();
         foreach (var teacher in teachers)
-            if (teacher is not null)
-                teacherIds[teacher] = GetOrCreate(connection, "teachers", "name", teacher);
+            teacherIds[teacher!] = GetOrCreate(connection, "teachers", "name", teacher!);
 
         var roomIds = new Dictionary<string, long>();
         foreach (var room in rooms)
-            if (room is not null)
-                roomIds[room] = GetOrCreate(connection, "rooms", "name", room);
+            roomIds[room!] = GetOrCreate(connection, "rooms", "name", room!);
+
+        // --- Подсчет глобальной нумерации занятий ---
+
+        // 1. Разворачиваем все занятия в плоский список (Дата + Курс)
+        var allLessons = courses
+            .Where(c => c.Dates != null)
+            .SelectMany(c => c.Dates!.Select(d => new { Date = d, Course = c }));
+
+        // 2. Группируем по логическому предмету (Предмет, Тип, Преподаватель, Подгруппа)
+        var logicalGroups = allLessons
+            .GroupBy(x => new { x.Course.Subject, x.Course.Type, x.Course.Teacher, x.Course.Subgroup });
+
+        // Ключ: (Ссылка на список дат курса, Конкретная дата)
+        var sequenceDict = new Dictionary<(List<NodaTime.LocalDate>?, NodaTime.LocalDate), int>();
+        var sequenceLengths = new Dictionary<(List<NodaTime.LocalDate>?, NodaTime.LocalDate), int>();
+
+        foreach (var group in logicalGroups)
+        {
+            // 3. Находим все УНИКАЛЬНЫЕ даты проведения предмета и сортируем их
+            var distinctDates = group.Select(x => x.Date).Distinct().OrderBy(d => d).ToList();
+            int totalLength = distinctDates.Count;
+
+            // 4. Создаем маппинг "Дата -> Порядковый номер" (номер = индекс + 1)
+            var dateToSequencePos = distinctDates
+                .Select((date, index) => new { date, position = index + 1 })
+                .ToDictionary(x => x.date, x => x.position);
+
+            // 5. Присваиваем эти значения всем занятиям из группы.
+            // Если 2 пары в один день, они получат одинаковую позицию из dateToSequencePos.
+            foreach (var lessonInfo in group)
+            {
+                var key = (lessonInfo.Course.Dates, lessonInfo.Date);
+                sequenceDict[key] = dateToSequencePos[lessonInfo.Date];
+                sequenceLengths[key] = totalLength;
+            }
+        }
+
+        // --- Конец подсчета ---
 
         foreach (var course in courses)
         {
             using var command = connection.CreateCommand();
             command.CommandText = @"
-                    INSERT INTO sessions (group_id, start_time, end_time)
-                    VALUES (@group_id, @start_time, @end_time);
-                    SELECT last_insert_rowid();";
+                INSERT INTO sessions (group_id, start_time, end_time)
+                VALUES (@group_id, @start_time, @end_time);
+                SELECT last_insert_rowid();";
 
             command.Parameters.AddWithValue("@group_id", groupId);
             command.Parameters.AddWithValue("@start_time", $"{course.StartTime.Hour:D2}:{course.StartTime.Minute:D2}");
@@ -122,9 +158,9 @@ public class DatabaseBuilder
             var roomId = !string.IsNullOrEmpty(course.Cabinet) ? roomIds[course.Cabinet] : (long?)null;
 
             command.CommandText = @"
-                    INSERT INTO lessons (session_id, subject, teacher_id, lesson_type, room_id, subgroup)
-                    VALUES (@session_id, @subject, @teacher_id, @lesson_type, @room_id, @subgroup);
-                    SELECT last_insert_rowid();";
+                INSERT INTO lessons (session_id, subject, teacher_id, lesson_type, room_id, subgroup)
+                VALUES (@session_id, @subject, @teacher_id, @lesson_type, @room_id, @subgroup);
+                SELECT last_insert_rowid();";
             command.Parameters.Clear();
             command.Parameters.AddWithValue("@session_id", sessionId);
             command.Parameters.AddWithValue("@subject", course.Subject);
@@ -135,20 +171,28 @@ public class DatabaseBuilder
 
             var lessonId = (long)(command.ExecuteScalar() ?? throw new NullReferenceException("lessonId is null"));
 
-
-            for (int i = 0; i < course.Dates?.Count; i++)
+            if (course.Dates != null)
             {
-                var date = course.Dates[i];
-                command.CommandText = @"
+                for (int i = 0; i < course.Dates.Count; i++)
+                {
+                    var date = course.Dates[i];
+                    var key = (course.Dates, date);
+
+                    // Достаем предрассчитанные глобальные значения. Если по какой-то причине их нет — используем старую логику.
+                    int sequencePosition = sequenceDict.TryGetValue(key, out var pos) ? pos : i + 1;
+                    int sequenceLength = sequenceLengths.TryGetValue(key, out var len) ? len : course.Dates.Count;
+
+                    command.CommandText = @"
                         INSERT INTO schedule_dates (lesson_id, date, sequence_position, sequence_length)
                         VALUES (@lesson_id, @date, @sequence_position, @sequence_length)";
-                command.Parameters.Clear();
-                command.Parameters.AddWithValue("@lesson_id", lessonId);
-                var dateParam = command.Parameters.Add("@date", SqliteType.Text);
-                dateParam.Value = new DateTime(currentYear, date.Month, date.Day).ToString("yyyy-MM-dd");
-                command.Parameters.AddWithValue("@sequence_position", i + 1);
-                command.Parameters.AddWithValue("@sequence_length", course.Dates?.Count);
-                command.ExecuteNonQuery();
+                    command.Parameters.Clear();
+                    command.Parameters.AddWithValue("@lesson_id", lessonId);
+                    var dateParam = command.Parameters.Add("@date", SqliteType.Text);
+                    dateParam.Value = new DateTime(currentYear, date.Month, date.Day).ToString("yyyy-MM-dd");
+                    command.Parameters.AddWithValue("@sequence_position", sequencePosition);
+                    command.Parameters.AddWithValue("@sequence_length", sequenceLength);
+                    command.ExecuteNonQuery();
+                }
             }
         }
     }
