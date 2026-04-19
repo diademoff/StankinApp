@@ -30,18 +30,20 @@ public class DatabaseScraper
 
     public void ProcessFolder(string folderPath)
     {
-        foreach (var file in Directory.GetFiles(folderPath, "*.json"))
+        var files = Directory.GetFiles(folderPath, "*.json");
+        for(int i = 0; i < files.Length; i++)
         {
+            var file = files[i];
             try
             {
-                Console.WriteLine($"processing file: {file}");
+                Console.WriteLine($"Обработка файла: {Path.GetFileName(file)} [{i + 1}/{files.Length}]");
                 ProcessJsonFile(file);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"error processing {file}: {ex.Message}");
+                Console.WriteLine($"Ошибка обработки файла {file}: {ex.Message}");
             }
         }
-        Console.WriteLine("database population completed!");
+        Console.WriteLine("Заполнение базы данных завершено!");
     }
 }

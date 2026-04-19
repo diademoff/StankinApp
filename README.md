@@ -72,6 +72,8 @@ cd StankinAppDatabase/StankinAppDatabase
 dotnet run -- create --json-path /path/to/json-folder --year 2026 --db-save-path schedule.db
 ```
 
+[Что делать при ошибке парсинга.](./StankinAppDatabase/StankinAppDatabase/README.md)
+
 Файл `schedule.db` — готовая SQLite база, которую нужно положить в `./deploy/data/`.
 
 ### 3. Запуск API

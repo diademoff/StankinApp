@@ -12,6 +12,10 @@ namespace StankinAppDatabase
         private const string TemporarySubject = "TEMPORARY_SUBJECT";
         private const string TemporaryTeacher = "Иванов А.Б.";
 
+        // Сколько раз подряд пользователь может нажать Enter без ввода,
+        // прежде чем строка будет пропущена автоматически
+        private const int MaxEmptyAttempts = 3;
+
         public List<string> SubjectNamesWithDots { get; private set; }
         public List<TeacherCorrection> AnomalyTeachers { get; private set; }
 
@@ -72,7 +76,7 @@ namespace StankinAppDatabase
 
             try
             {
-                courses = _reader.ParseLessons(
+                courses = _reader!.ParseLessons(
                     err.LineToParse.Replace(foundSubject, TemporarySubject),
                     err.StartTime,
                     err.Duration,
@@ -100,7 +104,7 @@ namespace StankinAppDatabase
 
             try
             {
-                courses = _reader.ParseLessons(
+                courses = _reader!.ParseLessons(
                     err.LineToParse.Replace(foundTeacher.IncorrectName, TemporaryTeacher),
                     err.StartTime,
                     err.Duration,
@@ -133,7 +137,7 @@ namespace StankinAppDatabase
                     .Replace(foundSubject, TemporarySubject)
                     .Replace(foundTeacher.IncorrectName, TemporaryTeacher);
 
-                courses = _reader.ParseLessons(
+                courses = _reader!.ParseLessons(
                     tempLine,
                     err.StartTime,
                     err.Duration,
@@ -152,72 +156,281 @@ namespace StankinAppDatabase
                 return false;
             }
         }
+
         private Course[] HandleParseError(ErrorParsingInfo err)
         {
-            DisplayErrorInfo(err);
-            var correction = GetUserCorrection(err);
-            ApplyCorrection(correction, err);
+            DisplayErrorBanner(err);
+            DisplayParsedVariants(err);
+            DisplayHints(err);
+
+            var correction = AskUserForCorrection(err);
+
+            if (correction == null)
+            {
+                PrintWarning("Строка пропущена и не будет добавлена в базу данных.");
+                return Array.Empty<Course>();
+            }
+
+            ApplyCorrection(correction);
             SaveFallbacks();
+            PrintSuccess($"Исправление сохранено в {_filePath}. Повторная попытка парсинга...");
 
             return ParseFallbackFunc(err);
         }
 
-        private void DisplayErrorInfo(ErrorParsingInfo err)
+        private static void DisplayErrorBanner(ErrorParsingInfo err)
         {
-            Console.WriteLine($"Ошибка при парсинге строки. Группа: {err.GroupName}\n");
-            Console.WriteLine(err.LineToParse);
-            Console.WriteLine("\nВарианты парсинга:");
+            var separator = new string('─', 60);
+            Console.WriteLine();
+            PrintColor($"┌{separator}┐", ConsoleColor.Yellow);
+            PrintColor($"│  ⚠  Не удалось распарсить строку расписания{new string(' ', 16)}│", ConsoleColor.Yellow);
+            PrintColor($"│  Группа: {err.GroupName,-50}│", ConsoleColor.Yellow);
+            PrintColor($"└{separator}┘", ConsoleColor.Yellow);
+            Console.WriteLine();
+            Console.WriteLine("  Исходная строка:");
+            PrintColor($"  > {err.LineToParse}", ConsoleColor.Cyan);
+            Console.WriteLine();
+        }
 
+        private static void DisplayParsedVariants(ErrorParsingInfo err)
+        {
+            if (err.FailedToParseCourses.Count == 0)
+            {
+                PrintColor("  Парсер не смог извлечь ни одного занятия из этой строки.", ConsoleColor.DarkYellow);
+                Console.WriteLine();
+                return;
+            }
+
+            Console.WriteLine("  Парсер попытался извлечь следующие занятия (с ошибками):");
+            Console.WriteLine();
             for (int i = 0; i < err.FailedToParseCourses.Count; i++)
             {
                 var course = err.FailedToParseCourses[i];
-                Console.WriteLine($"{i + 1}. Предмет: {course.Subject}\n   Преподаватель: {course.Teacher}\n   Тип: {course.Type}\n");
+                PrintColor($"  [{i + 1}]", ConsoleColor.White);
+                Console.WriteLine($"      Предмет:      {course.Subject}");
+                Console.WriteLine($"      Преподаватель:{course.Teacher}");
+                Console.WriteLine($"      Тип:          {course.Type}");
+                Console.WriteLine();
             }
         }
 
-        private Correction GetUserCorrection(ErrorParsingInfo err)
+        private static void DisplayHints(ErrorParsingInfo err)
         {
-            Console.WriteLine("Где ошибка парсинга?");
-            Console.Write("Номер строки: ");
-            int lineNumber = int.Parse(Console.ReadLine(), NumberStyles.Integer, CultureInfo.InvariantCulture);
+            Console.WriteLine("  Возможные причины ошибки:");
 
-            Console.WriteLine("Тип ошибки:\n1. Предмет с точкой\n2. Преподаватель");
-            Console.Write("Тип ошибки: ");
-            int errorType = int.Parse(Console.ReadLine(), NumberStyles.Integer, CultureInfo.InvariantCulture);
+            // Подсказка: точка в названии предмета
+            bool likelyDottedSubject = err.FailedToParseCourses.Any(c =>
+                !string.IsNullOrWhiteSpace(c.Subject) && c.Subject.Length <= 3);
 
-            var selectedCourse = err.FailedToParseCourses[lineNumber - 1];
+            // Подсказка: преподаватель не в формате Фамилия И.О.
+            bool likelyAnomalyTeacher = err.FailedToParseCourses.Any(c =>
+                !string.IsNullOrWhiteSpace(c.Teacher) &&
+                !System.Text.RegularExpressions.Regex.IsMatch(c.Teacher, @"^[А-ЯЁ][а-яё]+\s+[А-ЯЁ]\.[А-ЯЁ]\.$"));
 
-            Console.WriteLine("Введите старое значение: ");
-            string oldValue = Console.ReadLine();
+            if (likelyDottedSubject)
+                PrintColor("  • Название предмета содержит точку (парсер принял её за разделитель).", ConsoleColor.DarkYellow);
 
-            Console.Write($"Новое значение для \"{oldValue}\": ");
-            string newValue = Console.ReadLine();
+            if (likelyAnomalyTeacher)
+                PrintColor("  • ФИО преподавателя не в стандартном формате «Иванов И.И.».", ConsoleColor.DarkYellow);
 
-            return new Correction(errorType, oldValue, newValue);
+            if (!likelyDottedSubject && !likelyAnomalyTeacher)
+                PrintColor("  • Строка не соответствует ожидаемому формату.", ConsoleColor.DarkYellow);
+
+            Console.WriteLine();
+            PrintColor("  Справка: см. README.md → раздел «Что делать при ошибке парсинга»", ConsoleColor.DarkGray);
+            Console.WriteLine();
         }
 
-        private void ApplyCorrection(Correction correction, ErrorParsingInfo err)
+        private Correction? AskUserForCorrection(ErrorParsingInfo err)
         {
-            switch (correction.ErrorType)
+            Console.WriteLine("  Выберите тип ошибки или пропустите строку:");
+            Console.WriteLine();
+            PrintColor("  [1]", ConsoleColor.Green);
+            Console.WriteLine(" Предмет с точкой в названии");
+            PrintColor("  [2]", ConsoleColor.Green);
+            Console.WriteLine(" Нестандартное ФИО преподавателя");
+            Console.WriteLine();
+
+            while (true)
             {
-                case 1:
-                    SubjectNamesWithDots.Add(correction.NewValue);
-                    Console.WriteLine("Добавлен предмет с точкой");
+                Console.Write("  Ваш выбор: ");
+                var choice = (Console.ReadLine() ?? "").Trim().ToLowerInvariant();
+
+                switch (choice)
+                {
+                    case "1":
+                        return AskForDottedSubjectCorrection(err);
+                    case "2":
+                        return AskForTeacherCorrection(err);
+                    case "":
+                        return null;
+                    default:
+                        PrintColor("  Введите 1 или 2", ConsoleColor.Red);
+                        break;
+                }
+            }
+        }
+
+        private Correction? AskForDottedSubjectCorrection(ErrorParsingInfo err)
+        {
+            Console.WriteLine();
+            Console.WriteLine("  Введите полное правильное название предмета (с точкой).");
+            Console.WriteLine("  Пример: «Технологии индустрии 4.0»");
+            Console.WriteLine();
+
+            string? value = PromptNonEmpty("  Название предмета: ");
+            if (value == null) return null;
+
+            // Показываем строку с подсветкой введённого значения для проверки
+            var highlighted = err.LineToParse.Replace(value,
+                $"\x1b[93m{value}\x1b[0m");  // жёлтый ANSI
+            Console.WriteLine();
+            Console.WriteLine($"  Строка с подсветкой предмета: {highlighted}");
+            Console.WriteLine();
+
+            return new Correction(CorrectionType.DottedSubject, value, value);
+        }
+
+        private Correction? AskForTeacherCorrection(ErrorParsingInfo err)
+        {
+            Console.WriteLine();
+            Console.WriteLine("  Введите ФИО преподавателя так, как оно стоит в строке (неверное).");
+
+            var knownTeachers = err.FailedToParseCourses
+                .Select(c => c.Teacher)
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .Distinct()
+                .ToList();
+
+            if (knownTeachers.Count > 0)
+            {
+                Console.WriteLine("  Парсер извлёк следующих преподавателей (скопируйте нужное):");
+                for (int i = 0; i < knownTeachers.Count; i++)
+                    PrintColor($"    [{i + 1}] {knownTeachers[i]}", ConsoleColor.Cyan);
+                Console.WriteLine();
+            }
+
+            string? incorrectName = PromptNonEmpty("  Неверное ФИО: ");
+            if (incorrectName == null) return null;
+
+            Console.WriteLine();
+            Console.WriteLine("  Теперь введите правильное отображаемое имя.");
+            Console.WriteLine("  Если менять ничего не нужно — нажмите Enter, будет использовано введённое имя.");
+            Console.Write("  Правильное ФИО: ");
+            var correctName = Console.ReadLine()?.Trim();
+            if (string.IsNullOrWhiteSpace(correctName))
+                correctName = incorrectName;
+
+            Console.WriteLine();
+            Console.WriteLine($"  Будет добавлено: «{incorrectName}» → «{correctName}»");
+
+            if (!Confirm("  Подтверждаете?"))
+                return null;
+
+            return new Correction(CorrectionType.AnomalyTeacher, incorrectName, correctName);
+        }
+
+
+        private void ApplyCorrection(Correction correction)
+        {
+            switch (correction.Type)
+            {
+                case CorrectionType.DottedSubject:
+                    if (!SubjectNamesWithDots.Contains(correction.NewValue))
+                    {
+                        SubjectNamesWithDots.Add(correction.NewValue);
+                        PrintSuccess($"Добавлен предмет с точкой: «{correction.NewValue}»");
+                    }
+                    else
+                    {
+                        PrintColor("  Этот предмет уже есть в списке.", ConsoleColor.DarkYellow);
+                    }
                     break;
-                case 2:
-                    AnomalyTeachers.Add(new TeacherCorrection(correction.OldValue, correction.NewValue));
-                    Console.WriteLine("Добавлена коррекция преподавателя");
+
+                case CorrectionType.AnomalyTeacher:
+                    var existing = AnomalyTeachers.FirstOrDefault(t => t.IncorrectName == correction.OldValue);
+                    if (existing == null)
+                    {
+                        AnomalyTeachers.Add(new TeacherCorrection(correction.OldValue, correction.NewValue));
+                        PrintSuccess($"Добавлен преподаватель: «{correction.OldValue}» → «{correction.NewValue}»");
+                    }
+                    else
+                    {
+                        PrintColor($"  Преподаватель «{correction.OldValue}» уже есть в списке.", ConsoleColor.DarkYellow);
+                    }
                     break;
             }
         }
+
+        /// <summary>
+        /// Запрашивает строку, повторяя приглашение при пустом вводе.
+        /// Возвращает null, если пользователь несколько раз подряд ввёл пустую строку.
+        /// </summary>
+        private static string? PromptNonEmpty(string prompt)
+        {
+            int emptyCount = 0;
+            while (emptyCount < MaxEmptyAttempts)
+            {
+                Console.Write(prompt);
+                var input = Console.ReadLine()?.Trim();
+                if (!string.IsNullOrWhiteSpace(input))
+                    return input;
+
+                emptyCount++;
+                int remaining = MaxEmptyAttempts - emptyCount;
+                if (remaining > 0)
+                    PrintColor($"  Пустой ввод. Попробуйте ещё раз (осталось попыток: {remaining}).", ConsoleColor.DarkYellow);
+            }
+
+            PrintColor("  Ввод отменён.", ConsoleColor.DarkGray);
+            return null;
+        }
+
+        private static bool Confirm(string prompt)
+        {
+            while (true)
+            {
+                Console.Write($"{prompt} [д/н]: ");
+                var answer = (Console.ReadLine() ?? "").Trim().ToLowerInvariant();
+                if (answer is "д" or "y" or "да" or "yes") return true;
+                if (answer is "н" or "n" or "нет" or "no" or "") return false;
+                PrintColor("  Введите «д» или «н».", ConsoleColor.Red);
+            }
+        }
+
+        private static void PrintColor(string message, ConsoleColor color)
+        {
+            var prev = Console.ForegroundColor;
+            Console.ForegroundColor = color;
+            Console.WriteLine(message);
+            Console.ForegroundColor = prev;
+        }
+
+        private static void PrintSuccess(string message)
+        {
+            Console.Write("  ");
+            PrintColor($"✓ {message}", ConsoleColor.Green);
+            Console.WriteLine();
+        }
+
+        private static void PrintWarning(string message)
+        {
+            Console.Write("  ");
+            PrintColor($"⚠ {message}", ConsoleColor.DarkYellow);
+            Console.WriteLine();
+        }
+
+
+        private enum CorrectionType { DottedSubject, AnomalyTeacher }
 
         private class FallbackData
         {
-            public List<string> SubjectNamesWithDots { get; set; }
-            public List<TeacherCorrection> AnomalyTeachers { get; set; }
+            public List<string> SubjectNamesWithDots { get; set; } = new();
+            public List<TeacherCorrection> AnomalyTeachers { get; set; } = new();
         }
 
         public record TeacherCorrection(string IncorrectName, string CorrectName);
-        private record Correction(int ErrorType, string OldValue, string NewValue);
+
+        private record Correction(CorrectionType Type, string OldValue, string NewValue);
     }
 }
