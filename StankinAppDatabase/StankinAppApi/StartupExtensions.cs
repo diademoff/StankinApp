@@ -98,7 +98,17 @@ static class StartupExtensions
             ? dbPath
             : Path.Combine(builder.Environment.ContentRootPath, dbPath);
 
-        builder.Services.AddSingleton<IDataReader>(_ => new DatabaseReader(absoluteDbPath));
+        var debugMode = configuration.GetValue<bool>("Debug:Enabled");
+        if (debugMode && !File.Exists(absoluteDbPath))
+        {
+            // debug mode without DB — return mock data
+            builder.Services.AddSingleton<IDataReader>(_ => new MockDataReader());
+            Console.Error.WriteLine("[Debug] DB not found at {0}, using mock data", absoluteDbPath);
+        }
+        else
+        {
+            builder.Services.AddSingleton<IDataReader>(_ => new DatabaseReader(absoluteDbPath));
+        }
         builder.Services.AddSingleton<IScheduleService, ScheduleService>();
     }
 
