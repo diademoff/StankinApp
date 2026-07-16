@@ -1,0 +1,17 @@
+meta {
+  name: get_schedule_by_subject
+  type: http
+  seq: 5
+}
+
+get {
+  url: http://localhost:5000/api/schedule/by-subject?subject=Дискретная математика&teacher=Козлов А.Б.&groupName=АДБ-24-03
+  body: none
+  auth: inherit
+}
+
+params:query {
+  subject: Дискретная математика
+  teacher: Козлов А.Б.
+  groupName: АДБ-24-03
+}
