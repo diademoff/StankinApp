@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="StankinAppApi/StankinAppApi.csproj" />
+  <Project Path="StankinAppCore/StankinAppCore.csproj" />
+  <Project Path="StankinAppDatabase.Tests/StankinAppDatabase.Tests.csproj" />
+  <Project Path="StankinAppDatabase/StankinAppDatabase.csproj" />
+</Solution>
