@@ -13,7 +13,7 @@ namespace StankinAppDatabase
 
         readonly Func<ErrorParsingInfo, Course[]> parseError = parseError;
 
-        public Schedule GetSchedule(string groupName, string fileJson)
+        public List<Course> GetSchedule(string groupName, string fileJson)
         {
             JObject data = JObject.Parse(fileJson);
             List<Course> courses = new List<Course>();
@@ -32,7 +32,6 @@ namespace StankinAppDatabase
                     var str_startTime = timeParts[0].Trim();
                     var str_endTime = timeParts[1].Trim();
 
-                    // Время хранится как начало LocalTime и продолжительность Period
                     string[] startTimeParts = str_startTime.Split(':');
                     string[] endTimeParts = str_endTime.Split(':');
 
@@ -61,7 +60,7 @@ namespace StankinAppDatabase
                 }
             }
 
-            return new Schedule(groupName, courses);
+            return courses;
         }
 
         /// <summary>

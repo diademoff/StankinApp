@@ -4,20 +4,7 @@ using NodaTime;
 
 namespace StankinAppApi;
 
-public interface IScheduleService
-{
-    IEnumerable<string> GetGroups();
-    IEnumerable<string> GetRooms();
-    IEnumerable<string> GetTeachers();
-
-    /// <summary>
-    /// Возвращает плоский список занятий за период.
-    /// startDate / endDate — строки "yyyy-MM-dd".
-    /// </summary>
-    IEnumerable<CourseDto> GetMergedScheduleForGroup(string groupName, string startDate, string endDate);
-}
-
-public class ScheduleService : IScheduleService
+public class ScheduleService
 {
     private readonly IDataReader _db;
     private const double MaxGapMinutes = 30;
@@ -104,7 +91,6 @@ public class ScheduleService : IScheduleService
         var durationMin = (int)(i.End - i.Start).ToDuration().TotalMinutes;
         var subgroupKey = string.IsNullOrEmpty(i.Subgroup) ? "all" : i.Subgroup;
 
-        // Уникальный id для Alpine x-for :key
         var id = $"{i.GroupName}_{dateStr}_{startStr}_{subgroupKey}"
                  .Replace(" ", "_");
 

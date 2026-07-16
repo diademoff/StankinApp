@@ -2,9 +2,6 @@ using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Caching.Memory;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
 using Serilog;
 using StankinAppApi.Dto;
 using StankinAppCore;
@@ -17,38 +14,16 @@ static class StartupExtensions
     [
       "stankinapp.ru"
     ];
+
     public static void ConfigureLogging(this WebApplicationBuilder builder)
     {
         Log.Logger = new LoggerConfiguration()
             .Enrich.FromLogContext()
             .MinimumLevel.Error()
             .WriteTo.Console()
-            .WriteTo.File(
-                path: "Logs/schedule-api-.log",
-                rollingInterval: RollingInterval.Day,
-                retainedFileCountLimit: 7,
-                outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss} [{Level:u3}] {Message:lj}{NewLine}{Exception}"
-            )
             .CreateLogger();
 
         builder.Host.UseSerilog();
-    }
-
-    public static void ConfigureOpenTelemetry(this WebApplicationBuilder builder)
-    {
-        builder.Services.AddOpenTelemetry()
-            .ConfigureResource(r => r.AddService("StankinAppApi"))
-            .WithTracing(t => t
-                .AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation()
-                .AddSqlClientInstrumentation(o => o.SetDbStatementForText = true)
-            )
-            .WithMetrics(m => m
-                .AddRuntimeInstrumentation()
-                .AddHttpClientInstrumentation()
-                .AddProcessInstrumentation()
-                .AddPrometheusExporter()
-            );
     }
 
     public static void ConfigureKestrel(this WebApplicationBuilder builder)
@@ -59,7 +34,6 @@ static class StartupExtensions
             opts.AddServerHeader = false;
         });
     }
-
 
     public static void ConfigureCors(this WebApplicationBuilder builder)
     {
@@ -88,7 +62,6 @@ static class StartupExtensions
             });
 
         builder.Services.AddMemoryCache();
-        builder.Services.AddHttpClient();
 
         var dbPath = configuration.GetValue<string>("Database:Path");
         if (string.IsNullOrEmpty(dbPath))
@@ -101,7 +74,6 @@ static class StartupExtensions
         var debugMode = configuration.GetValue<bool>("Debug:Enabled");
         if (debugMode && !File.Exists(absoluteDbPath))
         {
-            // debug mode without DB — return mock data
             builder.Services.AddSingleton<IDataReader>(_ => new MockDataReader());
             Console.Error.WriteLine("[Debug] DB not found at {0}, using mock data", absoluteDbPath);
         }
@@ -109,35 +81,35 @@ static class StartupExtensions
         {
             builder.Services.AddSingleton<IDataReader>(_ => new DatabaseReader(absoluteDbPath));
         }
-        builder.Services.AddSingleton<IScheduleService, ScheduleService>();
+        builder.Services.AddSingleton<ScheduleService>();
     }
 
     public static void MapApi(this WebApplication app)
     {
         app.MapControllers();
 
-        app.MapGet("/api/groups", (IScheduleService service, ILogger<Program> log) =>
+        app.MapGet("/api/groups", (ScheduleService service, ILogger<Program> log) =>
         {
             log.LogInformation("GET /api/groups");
             var groups = service.GetGroups().ToList();
             return Results.Ok(new ListResponse<string>(groups));
         });
 
-        app.MapGet("/api/rooms", (IScheduleService service, ILogger<Program> log) =>
+        app.MapGet("/api/rooms", (ScheduleService service, ILogger<Program> log) =>
         {
             log.LogInformation("GET /api/rooms");
             var rooms = service.GetRooms().ToList();
             return Results.Ok(new ListResponse<string>(rooms));
         });
 
-        app.MapGet("/api/teachers", (IScheduleService service, ILogger<Program> log) =>
+        app.MapGet("/api/teachers", (ScheduleService service, ILogger<Program> log) =>
         {
             log.LogInformation("GET /api/teachers");
             var teachers = service.GetTeachers().ToList();
             return Results.Ok(new ListResponse<string>(teachers));
         });
 
-        app.MapGet("/api/teachers/validate", (string name, IScheduleService service, ILogger<Program> log) =>
+        app.MapGet("/api/teachers/validate", (string name, ScheduleService service, ILogger<Program> log) =>
         {
             if (string.IsNullOrWhiteSpace(name))
                 return Results.BadRequest(new { error = "Missing 'name' parameter" });
@@ -149,7 +121,7 @@ static class StartupExtensions
 
         app.MapGet("/api/schedule",
             (string groupName, string startDate, string endDate,
-             IScheduleService service, IMemoryCache cache, ILogger<Program> log) =>
+             ScheduleService service, IMemoryCache cache, ILogger<Program> log) =>
         {
             if (string.IsNullOrWhiteSpace(groupName) ||
                 string.IsNullOrWhiteSpace(startDate)  ||
@@ -194,17 +166,7 @@ static class StartupExtensions
             if (lessons.Count == 0)
                 return Results.NoContent();
 
-            var weekStart = parsedStart.AddDays(-(int)parsedStart.DayOfWeek == 0 ? 6 : (int)parsedStart.DayOfWeek - 1);
-
-            var metadata = new ScheduleMetadata(
-                NextWeek:    weekStart.AddDays(7).ToString("yyyy-MM-dd"),
-                PrevWeek:    weekStart.AddDays(-7).ToString("yyyy-MM-dd"),
-                PeriodStart: startDate,
-                PeriodEnd:   endDate,
-                IsLastWeek:  false
-            );
-
-            return Results.Ok(new ApiResponse<CourseDto>(metadata, lessons));
+            return Results.Ok(new ListResponse<CourseDto>(lessons));
         });
 
 
@@ -236,16 +198,7 @@ static class StartupExtensions
                     SequenceLength: c.SequenceLength
                 ));
 
-                var start = DateTime.ParseExact(startDate, "yyyy-MM-dd", CultureInfo.InvariantCulture);
-                var metadata = new ScheduleMetadata(
-                    NextWeek: start.AddDays(7).ToString("yyyy-MM-dd"),
-                    PrevWeek: start.AddDays(-7).ToString("yyyy-MM-dd"),
-                    PeriodStart: startDate,
-                    PeriodEnd: endDate,
-                    IsLastWeek: false
-                );
-
-                return Results.Ok(new ApiResponse<CourseDto>(metadata, dtos));
+                return Results.Ok(new ListResponse<CourseDto>(dtos));
             }
             catch (ArgumentException ex)
             {

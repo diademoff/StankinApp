@@ -23,9 +23,9 @@ public class DatabaseScraper
     {
         var json = File.ReadAllText(filePath);
         var groupName = Path.GetFileNameWithoutExtension(filePath);
-        var schedule = _scheduleReader.GetSchedule(groupName, json);
+        var courses = _scheduleReader.GetSchedule(groupName, json);
 
-        _databaseBuilder.InsertGroupSchedule(groupName, schedule.Days, _currentYear);
+        _databaseBuilder.InsertGroupSchedule(groupName, courses, _currentYear);
     }
 
     public void ProcessFolder(string folderPath)

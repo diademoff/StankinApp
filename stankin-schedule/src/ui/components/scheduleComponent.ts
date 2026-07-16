@@ -1,16 +1,35 @@
-import { LoadScheduleWeekUseCase } from '../../core/use-cases/LoadScheduleWeekUseCase';
-import { LoadTeacherScheduleWeekUseCase } from '../../core/use-cases/LoadTeacherScheduleWeekUseCase';
+import { ApiClient } from '../../infra/api/ApiClient';
+import { LocalStorageCache } from '../../infra/cache/LocalStorageCache';
+import { SCHEDULE_CONFIG } from '../../shared/config';
 import { DateUtils } from '../../shared/date-utils';
 import { Lesson } from '../../shared/types';
 import { ScheduleMemory } from '../../shared/scheduleMemory';
 import Swiper from 'swiper';
 import 'swiper/css';
 
+function mapToLessons(items: any[]): Lesson[] {
+  return (items || []).map(it => ({
+    id:               it.id,
+    date:             it.date,
+    startTime:        it.startTime,
+    endTime:          it.endTime,
+    durationMinutes:  it.durationMinutes,
+    groupName:        it.groupName,
+    subject:          it.subject,
+    teacher:          it.teacher || undefined,
+    type:             it.type,
+    subgroup:         it.subgroup || undefined,
+    cabinet:          it.cabinet || undefined,
+    sequencePosition: it.sequencePosition,
+    sequenceLength:   it.sequenceLength,
+  }));
+}
+
 export function scheduleComponent(
   subjectName: string,
   viewMode: 'group' | 'teacher',
-  loadScheduleUseCase: LoadScheduleWeekUseCase,
-  loadTeacherScheduleUseCase: LoadTeacherScheduleWeekUseCase
+  api: ApiClient,
+  cache: LocalStorageCache
 ) {
   const mem = new ScheduleMemory();
 
@@ -38,7 +57,6 @@ export function scheduleComponent(
       const raw = mem.asGroupedObject();
 
       if (this.viewMode === 'teacher') {
-        // Объединяем пары с одинаковым предметом, кабинетом и временем начала
         const merged: Record<string, Lesson[]> = {};
         for (const [date, lessons] of Object.entries(raw)) {
           const map = new Map<string, Lesson>();
@@ -86,6 +104,9 @@ export function scheduleComponent(
 
       const startApi = DateUtils.formatDateForApi(weekStartDate);
       const endApi   = DateUtils.formatDateForApi(DateUtils.addDays(weekStartDate, 6));
+      const viewKey = this.viewMode === 'teacher' ? this.subjectName : this.subjectName;
+      const cacheKeyBase = this.viewMode === 'teacher' ? 'schedule_teacher' : 'schedule';
+      const cacheKey = cache.buildKey(cacheKeyBase, viewKey, `${startApi}_${endApi}`);
 
       try {
         if (direction === 'top')         this.loadingTop    = true;
@@ -96,10 +117,18 @@ export function scheduleComponent(
         this.error = null;
 
         let lessons: Lesson[];
-        if (this.viewMode === 'teacher') {
-          lessons = await loadTeacherScheduleUseCase.execute(this.subjectName, startApi, endApi);
+        const cached = cache.get(cacheKey, SCHEDULE_CONFIG.CACHE_TTL_MS);
+        if (cached) {
+          lessons = cached;
         } else {
-          lessons = await loadScheduleUseCase.execute(this.subjectName, startApi, endApi);
+          let items: any[];
+          if (this.viewMode === 'teacher') {
+            items = await api.getTeacherSchedule(this.subjectName, startApi, endApi);
+          } else {
+            items = await api.getSchedule(this.subjectName, startApi, endApi);
+          }
+          lessons = mapToLessons(items);
+          cache.set(cacheKey, lessons);
         }
 
         const days = DateUtils.rangeDays(weekStartDate, 7);
@@ -310,8 +339,6 @@ export function scheduleComponent(
           const todayStr     = DateUtils.toIsoDate(new Date());
           const todayElement = container.querySelector(`#date-${todayStr}`) as HTMLElement;
           if (todayElement) {
-            // вычитаем offsetTop контейнера и добавляем отступ 8px,
-            // чтобы заголовок даты не прятался под карусель с датами
             const offset = todayElement.getBoundingClientRect().top
               - container.getBoundingClientRect().top
               + container.scrollTop

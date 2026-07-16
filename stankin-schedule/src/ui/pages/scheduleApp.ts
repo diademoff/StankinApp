@@ -1,27 +1,18 @@
-import { LoadGroupsUseCase } from '../../core/use-cases/LoadGroupsUseCase';
-import { LoadScheduleWeekUseCase } from '../../core/use-cases/LoadScheduleWeekUseCase';
-import { LoadTeachersUseCase } from '../../core/use-cases/LoadTeachersUseCase';
+import { ApiClient } from '../../infra/api/ApiClient';
+import { LocalStorageCache } from '../../infra/cache/LocalStorageCache';
+import { SCHEDULE_CONFIG } from '../../shared/config';
 
-export function scheduleApp(
-  loadGroupsUseCase: LoadGroupsUseCase,
-  _loadScheduleUseCase: LoadScheduleWeekUseCase,
-  loadTeachersUseCase: LoadTeachersUseCase
-) {
+export function scheduleApp(api: ApiClient, cache: LocalStorageCache) {
   return {
     groups: [] as string[],
     teachers: [] as string[],
     selectedGroup: null as string | null,
     selectedTeacher: null as string | null,
-    /** 'group' | 'teacher' */
     viewMode: 'group' as 'group' | 'teacher',
     error: null as string | null,
     loadingGroups: false,
     loadingTeachers: false,
-
-    /** Строка поиска преподавателя в режиме выбора */
     teacherSearch: '',
-
-    /** Показывать ли picker (поп-ап выбора группы/преподавателя) */
     showPicker: false,
 
     get filteredTeachers(): string[] {
@@ -45,7 +36,6 @@ export function scheduleApp(
     async init() {
       await this.loadGroups();
 
-      // Восстанавливаем из localStorage
       const savedMode = localStorage.getItem('viewMode') as 'group' | 'teacher' | null;
       if (savedMode) this.viewMode = savedMode;
 
@@ -64,8 +54,15 @@ export function scheduleApp(
       this.loadingGroups = true;
       this.error = null;
       try {
-        const groups = await loadGroupsUseCase.execute();
+        const key = cache.buildKey('groups');
+        const cached = cache.get(key, SCHEDULE_CONFIG.CACHE_TTL_MS / 2);
+        if (cached) {
+          this.groups = cached;
+          return;
+        }
+        const groups = await api.getGroups();
         this.groups = Array.isArray(groups) ? groups : [];
+        cache.set(key, this.groups);
       } catch (e) {
         console.error('loadGroups error', e);
         this.error = 'Не удалось загрузить список групп';
@@ -79,8 +76,15 @@ export function scheduleApp(
       this.loadingTeachers = true;
       this.error = null;
       try {
-        const teachers = await loadTeachersUseCase.execute();
+        const key = cache.buildKey('teachers');
+        const cached = cache.get(key, SCHEDULE_CONFIG.CACHE_TTL_MS / 2);
+        if (cached) {
+          this.teachers = cached;
+          return;
+        }
+        const teachers = await api.getTeachers();
         this.teachers = Array.isArray(teachers) ? teachers : [];
+        cache.set(key, this.teachers);
       } catch (e) {
         console.error('loadTeachers error', e);
         this.error = 'Не удалось загрузить список преподавателей';
@@ -90,10 +94,7 @@ export function scheduleApp(
     },
 
     selectGroup(group: string) {
-      // Сбрасываем значение в null, чтобы Alpine размонтировал компонент расписания
       this.selectedGroup = null;
-
-      // Через 10мс устанавливаем новую группу. Alpine создаст свежий компонент расписания.
       setTimeout(() => {
         this.selectedGroup = group;
         this.showPicker = false;
@@ -103,7 +104,6 @@ export function scheduleApp(
 
     selectTeacher(teacher: string) {
       this.selectedTeacher = null;
-
       setTimeout(() => {
         this.selectedTeacher = teacher;
         this.showPicker = false;
@@ -127,11 +127,9 @@ export function scheduleApp(
     async switchMode(mode: 'group' | 'teacher') {
       if (this.viewMode === mode) return;
 
-      // Сохраняем текущие значения
       const savedGroup = this.selectedGroup;
       const savedTeacher = this.selectedTeacher;
 
-      // Принудительно сбрасываем, чтобы спровоцировать полное размонтирование
       this.selectedGroup = null;
       this.selectedTeacher = null;
 
