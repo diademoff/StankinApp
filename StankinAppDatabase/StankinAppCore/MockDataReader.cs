@@ -68,6 +68,8 @@ public class MockDataReader : IDataReader
         => _reader.GetScheduleForRoom(roomName, startDate, endDate);
     public IEnumerable<Course> GetScheduleForTeacher(string teacherName, string startDate, string endDate)
         => _reader.GetScheduleForTeacher(teacherName, startDate, endDate);
+    public IEnumerable<Course> GetScheduleBySubject(string subjectName, string teacherName, string groupName, string startDate, string endDate)
+        => _reader.GetScheduleBySubject(subjectName, teacherName, groupName, startDate, endDate);
 
     private void CreateSchema()
     {

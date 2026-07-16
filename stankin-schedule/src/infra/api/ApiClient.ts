@@ -50,4 +50,11 @@ export class ApiClient {
     const response = await this.fetchJson(url);
     return response?.items ?? [];
   }
+
+  async getScheduleBySubject(subject: string, teacher: string, groupName: string): Promise<any[]> {
+    const params = new URLSearchParams({ subject, teacher, groupName });
+    const url = `${this.base}/api/schedule/by-subject?${params.toString()}`;
+    const response = await this.fetchJson(url);
+    return response?.items ?? [];
+  }
 }

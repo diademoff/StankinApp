@@ -18,7 +18,20 @@ public class ScheduleService
     public IEnumerable<CourseDto> GetMergedScheduleForGroup(
         string groupName, string startDate, string endDate)
     {
-        var courses   = _db.GetScheduleForGroup(groupName, startDate, endDate);
+        var courses = _db.GetScheduleForGroup(groupName, startDate, endDate);
+        return MergeAndToDtoList(courses);
+    }
+
+    public IEnumerable<CourseDto> GetScheduleBySubject(
+        string subjectName, string teacherName, string groupName,
+        string startDate, string endDate)
+    {
+        var courses = _db.GetScheduleBySubject(subjectName, teacherName, groupName, startDate, endDate);
+        return MergeAndToDtoList(courses);
+    }
+
+    private static IEnumerable<CourseDto> MergeAndToDtoList(IEnumerable<Course> courses)
+    {
         var instances = new List<LessonInstance>();
 
         foreach (var c in courses)

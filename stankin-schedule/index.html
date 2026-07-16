@@ -394,6 +394,25 @@
                     </template>
                   </div>
 
+                  <div class="space-y-2 text-sm" x-show="!loadingRelated && relatedLessons.length > 0">
+                    <p class="font-medium text-gray-800">📋 Все занятия этого курса:</p>
+                    <div class="max-h-52 overflow-y-auto space-y-1 pr-1">
+                      <template x-for="(l, idx) in relatedLessons" :key="l.id">
+                        <div @click="navigateToLessonDate(l.date)"
+                          class="p-2 rounded-lg text-xs flex items-center gap-2 cursor-pointer hover:bg-blue-50 transition"
+                          :class="isSelectedDate(l.date) ? 'bg-blue-100 ring-1 ring-blue-300' : 'bg-gray-50'">
+                          <span class="font-mono text-gray-400 w-5 text-right shrink-0" x-text="idx + 1 + '.'"></span>
+                          <span class="font-medium text-gray-700" x-text="formatDate(l.date)"></span>
+                          <span class="font-mono text-gray-500" x-text="`${l.startTime}–${l.endTime}`"></span>
+                          <span :title="l.type" class="w-2.5 h-2.5 rounded-full shrink-0" :class="typeDotBg(l.type)"></span>
+                          <span x-show="l.cabinet" class="text-gray-400" x-text="`ауд.${l.cabinet}`"></span>
+                          <span x-show="l.subgroup" class="text-gray-400" x-text="`(${l.subgroup})`"></span>
+                        </div>
+                      </template>
+                    </div>
+                  </div>
+                  <div x-show="loadingRelated" class="text-sm text-gray-500 text-center">Загрузка...</div>
+
                   <button @click="closeDiscussionModal()"
                     class="block w-full text-center bg-gray-100 text-gray-700 font-medium py-3 px-4 rounded-xl hover:bg-gray-200 transition-all duration-150 active:scale-95">
                     Закрыть

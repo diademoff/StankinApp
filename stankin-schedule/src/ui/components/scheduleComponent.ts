@@ -52,6 +52,8 @@ export function scheduleComponent(
     updating: false,
     isDiscussionModalOpen: false,
     selectedLessonForModal: null as Lesson | null,
+    relatedLessons: [] as Lesson[],
+    loadingRelated: false,
 
     updateGroupedSchedule() {
       const raw = mem.asGroupedObject();
@@ -370,6 +372,14 @@ export function scheduleComponent(
       return 'bg-gray-50 text-gray-700 ring-gray-200';
     },
 
+    typeDotBg(typeRaw: string) {
+      const t = (typeRaw || '').toLowerCase();
+      if (t.includes('лекц')) return 'bg-blue-500';
+      if (t.includes('лаб'))  return 'bg-green-500';
+      if (t.includes('сем'))  return 'bg-purple-500';
+      return 'bg-gray-400';
+    },
+
     formatCabinet(cab?: string) {
       const v = (cab || '').trim();
       return v.length ? v : 'кабинет не указан';
@@ -386,10 +396,30 @@ export function scheduleComponent(
     openDiscussionModal(lesson: Lesson) {
       this.selectedLessonForModal = lesson;
       this.isDiscussionModalOpen = true;
+      this.loadRelatedLessons(lesson);
     },
 
     closeDiscussionModal() {
       this.isDiscussionModalOpen = false;
+      this.relatedLessons = [];
+    },
+
+    async loadRelatedLessons(lesson: Lesson) {
+      if (!lesson.subject || !lesson.teacher || !lesson.groupName) return;
+      this.loadingRelated = true;
+      try {
+        const items = await api.getScheduleBySubject(lesson.subject, lesson.teacher, lesson.groupName);
+        this.relatedLessons = mapToLessons(items);
+      } catch (e) {
+        console.error('loadRelatedLessons error', e);
+      } finally {
+        this.loadingRelated = false;
+      }
+    },
+
+    navigateToLessonDate(dateStr: string) {
+      this.closeDiscussionModal();
+      this.scrollToDate(dateStr);
     },
   };
 }

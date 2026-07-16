@@ -205,5 +205,55 @@ static class StartupExtensions
                 return Results.BadRequest(ex.Message);
             }
         });
+
+        app.MapGet("/api/schedule/by-subject", (
+            string subject,
+            string teacher,
+            string groupName,
+            ScheduleService service,
+            IMemoryCache cache,
+            ILogger<Program> log) =>
+        {
+            if (string.IsNullOrWhiteSpace(subject) ||
+                string.IsNullOrWhiteSpace(teacher) ||
+                string.IsNullOrWhiteSpace(groupName))
+            {
+                log.LogWarning("Missing parameters: subject={Subject}, teacher={Teacher}, groupName={GroupName}",
+                    subject, teacher, groupName);
+                return Results.BadRequest(new { error = "subject, teacher и groupName обязательны" });
+            }
+
+            var today = DateTime.Today;
+            var startDate = today.AddMonths(-6).ToString("yyyy-MM-dd");
+            var endDate   = today.AddMonths(6).ToString("yyyy-MM-dd");
+
+            var cacheKey = $"sched:subject:{subject}:{teacher}:{groupName}";
+            List<CourseDto> lessons;
+
+            if (!cache.TryGetValue(cacheKey, out lessons))
+            {
+                try
+                {
+                    lessons = service.GetScheduleBySubject(subject, teacher, groupName, startDate, endDate).ToList();
+                    cache.Set(cacheKey, lessons, TimeSpan.FromHours(2));
+                    log.LogInformation("Fetched from DB & cached: {Key}", cacheKey);
+                }
+                catch (Exception ex)
+                {
+                    log.LogError(ex, "Error fetching schedule by subject for {Subject}, {Teacher}, {GroupName}",
+                        subject, teacher, groupName);
+                    return Results.Json(new { error = "Внутренняя ошибка сервера" }, statusCode: 500);
+                }
+            }
+            else
+            {
+                log.LogInformation("Served from cache: {Key}", cacheKey);
+            }
+
+            if (lessons.Count == 0)
+                return Results.NoContent();
+
+            return Results.Ok(new ListResponse<CourseDto>(lessons));
+        });
     }
 }
