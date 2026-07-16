@@ -5,14 +5,29 @@ using NodaTime.Text;
 
 namespace StankinAppCore;
 
-public class DatabaseReader(string dbPath) : IDataReader
+public class DatabaseReader : IDataReader
 {
     private const string DateFormat = "yyyy-MM-dd";
     private const string TimeFormat = "HH:mm";
 
+    private readonly string? _dbPath;
+    private readonly SqliteConnection? _sharedConnection;
+
+    public DatabaseReader(string dbPath)
+    {
+        _dbPath = dbPath;
+    }
+
+    public DatabaseReader(SqliteConnection sharedConnection)
+    {
+        _sharedConnection = sharedConnection;
+    }
+
     private SqliteConnection GetOpenConnection()
     {
-        var connection = new SqliteConnection($"Data Source={dbPath}");
+        if (_sharedConnection != null)
+            return _sharedConnection;
+        var connection = new SqliteConnection($"Data Source={_dbPath}");
         connection.Open();
         return connection;
     }
@@ -20,12 +35,21 @@ public class DatabaseReader(string dbPath) : IDataReader
     private List<string> GetListFromTable(string tableName)
     {
         var items = new List<string>();
-        using var connection = GetOpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = $"SELECT name FROM {tableName} ORDER BY name";
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
-            items.Add(reader.GetString(0));
+        var connection = GetOpenConnection();
+        var ownsConnection = _sharedConnection == null;
+        try
+        {
+            using var command = connection.CreateCommand();
+            command.CommandText = $"SELECT name FROM {tableName} ORDER BY name";
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
+                items.Add(reader.GetString(0));
+        }
+        finally
+        {
+            if (ownsConnection)
+                connection.Dispose();
+        }
         return items;
     }
 
@@ -36,39 +60,48 @@ public class DatabaseReader(string dbPath) : IDataReader
     private List<Course> GetSchedule(string sql, params SqliteParameter[] parameters)
     {
         var courses = new List<Course>();
-        using var connection = GetOpenConnection();
-        using var command = connection.CreateCommand();
-        command.CommandText = sql;
-        command.Parameters.AddRange(parameters);
-        using var reader = command.ExecuteReader();
-        while (reader.Read())
+        var connection = GetOpenConnection();
+        var ownsConnection = _sharedConnection == null;
+        try
         {
-            var startTimeStr = reader.GetString(4);
-            var endTimeStr = reader.GetString(5);
-            var startTime = LocalTimePattern.CreateWithInvariantCulture(TimeFormat).Parse(startTimeStr).Value;
-            var endTime = LocalTimePattern.CreateWithInvariantCulture(TimeFormat).Parse(endTimeStr).Value;
-            var duration = Period.Between(startTime, endTime);
-
-            var dateStr = reader.GetString(8);
-            if (!DateTime.TryParseExact(dateStr, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dateFromDb))
-                throw new ArgumentException($"dateFromDb в неверном формате, ожидается {DateFormat}");
-
-            var parsedDate = LocalDate.FromDateTime(dateFromDb);
-
-            courses.Add(new Course
+            using var command = connection.CreateCommand();
+            command.CommandText = sql;
+            command.Parameters.AddRange(parameters);
+            using var reader = command.ExecuteReader();
+            while (reader.Read())
             {
-                Subject = reader.GetString(0),
-                Teacher = reader.GetString(1),
-                Type = reader.GetString(2),
-                Cabinet = reader.IsDBNull(3) ? null : reader.GetString(3),
-                StartTime = startTime,
-                Duration = duration,
-                Subgroup = reader.IsDBNull(6) ? null : reader.GetString(6),
-                GroupName = reader.GetString(7),
-                Dates = [parsedDate],
-                SequencePosition = reader.GetInt32(9),
-                SequenceLength = reader.GetInt32(10)
-            });
+                var startTimeStr = reader.GetString(4);
+                var endTimeStr = reader.GetString(5);
+                var startTime = LocalTimePattern.CreateWithInvariantCulture(TimeFormat).Parse(startTimeStr).Value;
+                var endTime = LocalTimePattern.CreateWithInvariantCulture(TimeFormat).Parse(endTimeStr).Value;
+                var duration = Period.Between(startTime, endTime);
+
+                var dateStr = reader.GetString(8);
+                if (!DateTime.TryParseExact(dateStr, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dateFromDb))
+                    throw new ArgumentException($"dateFromDb в неверном формате, ожидается {DateFormat}");
+
+                var parsedDate = LocalDate.FromDateTime(dateFromDb);
+
+                courses.Add(new Course
+                {
+                    Subject = reader.GetString(0),
+                    Teacher = reader.GetString(1),
+                    Type = reader.GetString(2),
+                    Cabinet = reader.IsDBNull(3) ? null : reader.GetString(3),
+                    StartTime = startTime,
+                    Duration = duration,
+                    Subgroup = reader.IsDBNull(6) ? null : reader.GetString(6),
+                    GroupName = reader.GetString(7),
+                    Dates = [parsedDate],
+                    SequencePosition = reader.GetInt32(9),
+                    SequenceLength = reader.GetInt32(10)
+                });
+            }
+        }
+        finally
+        {
+            if (ownsConnection)
+                connection.Dispose();
         }
         return courses;
     }

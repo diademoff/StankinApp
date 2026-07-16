@@ -72,10 +72,10 @@ static class StartupExtensions
             : Path.Combine(builder.Environment.ContentRootPath, dbPath);
 
         var debugMode = configuration.GetValue<bool>("Debug:Enabled");
-        if (debugMode && !File.Exists(absoluteDbPath))
+        if (debugMode)
         {
-            builder.Services.AddSingleton<IDataReader>(_ => new MockDataReader());
-            Console.Error.WriteLine("[Debug] DB not found at {0}, using mock data", absoluteDbPath);
+            Console.Error.WriteLine("[Debug] Using in-memory mock data");
+            builder.Services.AddSingleton<IDataReader>(_ => new StankinAppCore.MockDataReader());
         }
         else
         {
