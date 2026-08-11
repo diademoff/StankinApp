@@ -1,8 +1,6 @@
-import { ApiClient } from '../../infra/api/ApiClient';
-import { LocalStorageCache } from '../../infra/cache/LocalStorageCache';
-import { SCHEDULE_CONFIG } from '../../shared/config';
+import { ApiClient } from './ApiClient';
 
-export function scheduleApp(api: ApiClient, cache: LocalStorageCache) {
+export function scheduleApp(api: ApiClient) {
   return {
     groups: [] as string[],
     teachers: [] as string[],
@@ -54,15 +52,8 @@ export function scheduleApp(api: ApiClient, cache: LocalStorageCache) {
       this.loadingGroups = true;
       this.error = null;
       try {
-        const key = cache.buildKey('groups');
-        const cached = cache.get(key, SCHEDULE_CONFIG.CACHE_TTL_MS / 2);
-        if (cached) {
-          this.groups = cached;
-          return;
-        }
         const groups = await api.getGroups();
         this.groups = Array.isArray(groups) ? groups : [];
-        cache.set(key, this.groups);
       } catch (e) {
         console.error('loadGroups error', e);
         this.error = 'Не удалось загрузить список групп';
@@ -76,15 +67,8 @@ export function scheduleApp(api: ApiClient, cache: LocalStorageCache) {
       this.loadingTeachers = true;
       this.error = null;
       try {
-        const key = cache.buildKey('teachers');
-        const cached = cache.get(key, SCHEDULE_CONFIG.CACHE_TTL_MS / 2);
-        if (cached) {
-          this.teachers = cached;
-          return;
-        }
         const teachers = await api.getTeachers();
         this.teachers = Array.isArray(teachers) ? teachers : [];
-        cache.set(key, this.teachers);
       } catch (e) {
         console.error('loadTeachers error', e);
         this.error = 'Не удалось загрузить список преподавателей';

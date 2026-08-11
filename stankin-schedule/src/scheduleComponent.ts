@@ -1,35 +1,14 @@
-import { ApiClient } from '../../infra/api/ApiClient';
-import { LocalStorageCache } from '../../infra/cache/LocalStorageCache';
-import { SCHEDULE_CONFIG } from '../../shared/config';
-import { DateUtils } from '../../shared/date-utils';
-import { Lesson } from '../../shared/types';
-import { ScheduleMemory } from '../../shared/scheduleMemory';
+import { ApiClient } from './ApiClient';
+import { DateUtils } from './date-utils';
+import { Lesson } from './types';
+import { ScheduleMemory } from './scheduleMemory';
 import Swiper from 'swiper';
 import 'swiper/css';
-
-function mapToLessons(items: any[]): Lesson[] {
-  return (items || []).map(it => ({
-    id:               it.id,
-    date:             it.date,
-    startTime:        it.startTime,
-    endTime:          it.endTime,
-    durationMinutes:  it.durationMinutes,
-    groupName:        it.groupName,
-    subject:          it.subject,
-    teacher:          it.teacher || undefined,
-    type:             it.type,
-    subgroup:         it.subgroup || undefined,
-    cabinet:          it.cabinet || undefined,
-    sequencePosition: it.sequencePosition,
-    sequenceLength:   it.sequenceLength,
-  }));
-}
 
 export function scheduleComponent(
   subjectName: string,
   viewMode: 'group' | 'teacher',
-  api: ApiClient,
-  cache: LocalStorageCache
+  api: ApiClient
 ) {
   const mem = new ScheduleMemory();
 
@@ -104,11 +83,8 @@ export function scheduleComponent(
         return;
       }
 
-      const startApi = DateUtils.formatDateForApi(weekStartDate);
-      const endApi   = DateUtils.formatDateForApi(DateUtils.addDays(weekStartDate, 6));
-      const viewKey = this.viewMode === 'teacher' ? this.subjectName : this.subjectName;
-      const cacheKeyBase = this.viewMode === 'teacher' ? 'schedule_teacher' : 'schedule';
-      const cacheKey = cache.buildKey(cacheKeyBase, viewKey, `${startApi}_${endApi}`);
+      const startApi = DateUtils.toIsoDate(weekStartDate);
+      const endApi   = DateUtils.toIsoDate(DateUtils.addDays(weekStartDate, 6));
 
       try {
         if (direction === 'top')         this.loadingTop    = true;
@@ -119,19 +95,13 @@ export function scheduleComponent(
         this.error = null;
 
         let lessons: Lesson[];
-        const cached = cache.get(cacheKey, SCHEDULE_CONFIG.CACHE_TTL_MS);
-        if (cached) {
-          lessons = cached;
+        let items: any[];
+        if (this.viewMode === 'teacher') {
+          items = await api.getTeacherSchedule(this.subjectName, startApi, endApi);
         } else {
-          let items: any[];
-          if (this.viewMode === 'teacher') {
-            items = await api.getTeacherSchedule(this.subjectName, startApi, endApi);
-          } else {
-            items = await api.getSchedule(this.subjectName, startApi, endApi);
-          }
-          lessons = mapToLessons(items);
-          cache.set(cacheKey, lessons);
+          items = await api.getSchedule(this.subjectName, startApi, endApi);
         }
+        lessons = (items ?? []) as Lesson[];
 
         const days = DateUtils.rangeDays(weekStartDate, 7);
         for (const d of days) {
@@ -269,19 +239,10 @@ export function scheduleComponent(
 
     updateDateRanges() {
       const prevStart = DateUtils.addDays(this.weekStart, -7);
-      this.dateRanges[0] = this.generateRange(prevStart);
-      this.dateRanges[1] = this.generateRange(this.weekStart);
+      this.dateRanges[0] = DateUtils.rangeDays(prevStart, 7).map(DateUtils.toIsoDate);
+      this.dateRanges[1] = DateUtils.rangeDays(this.weekStart, 7).map(DateUtils.toIsoDate);
       const nextStart = DateUtils.addDays(this.weekStart, 7);
-      this.dateRanges[2] = this.generateRange(nextStart);
-    },
-
-    generateRange(start: Date): string[] {
-      const arr: string[] = [];
-      const d = DateUtils.startOfWeek(start);
-      for (let i = 0; i < 7; i++) {
-        arr.push(DateUtils.toIsoDate(DateUtils.addDays(d, i)));
-      }
-      return arr;
+      this.dateRanges[2] = DateUtils.rangeDays(nextStart, 7).map(DateUtils.toIsoDate);
     },
 
     async init() {
@@ -409,7 +370,7 @@ export function scheduleComponent(
       this.loadingRelated = true;
       try {
         const items = await api.getScheduleBySubject(lesson.subject, lesson.teacher, lesson.groupName);
-        this.relatedLessons = mapToLessons(items);
+        this.relatedLessons = (items ?? []) as Lesson[];
       } catch (e) {
         console.error('loadRelatedLessons error', e);
       } finally {

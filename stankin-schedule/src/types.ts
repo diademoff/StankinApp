@@ -1,5 +1,3 @@
-export type Group = string;
-
 export interface Lesson {
   id: string;
   date: string;        // "2026-03-29"

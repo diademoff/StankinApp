@@ -101,17 +101,6 @@
           <!-- Режим: ГРУППА -->
           <template x-if="viewMode === 'group'">
             <div x-data="{
-              selectedYear: null,
-              selectedAbbr: null,
-              get groupedGroups() {
-                const result = {};
-                const groups = $store ? [] : (window._schedAppGroups || []);
-                // fallback: берём из родительского контекста через closure
-                return result;
-              }
-            }" class="flex flex-col min-h-0 flex-1 px-4 pb-4">
-              <!-- Используем groups из scheduleApp через Alpine scope -->
-              <div x-data="{
                 selectedYear: null,
                 selectedAbbr: null,
                 get groupedGroups() {
@@ -141,7 +130,7 @@
                     .filter(g => g.startsWith(prefix))
                     .sort();
                 }
-              }" class="flex flex-col min-h-0 flex-1 overflow-y-auto">
+              }" class="flex flex-col min-h-0 flex-1 px-4 pb-4 overflow-y-auto">
 
                 <template x-if="!groups || groups.length === 0">
                   <p class="text-center text-gray-500 py-4 text-sm">Загрузка групп...</p>
