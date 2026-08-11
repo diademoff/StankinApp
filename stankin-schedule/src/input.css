@@ -1,3 +1,35 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ponytail: theme palette via CSS variables (prefers-color-scheme).
+   New color added in HTML must be mapped in tailwind.config.js and defined below. */
+:root {
+  --surface: #ffffff;
+  --g50: #f9fafb; --g100: #f3f4f6; --g200: #e5e7eb; --g400: #9ca3af;
+  --g500: #6b7280; --g600: #4b5563; --g700: #374151; --g800: #1f2937;
+  --s50: #f8fafc; --s200: #e2e8f0; --s300: #cbd5e1; --s700: #334155;
+  --b50: #eff6ff; --b100: #dbeafe; --b200: #bfdbfe; --b300: #93c5fd;
+  --b400: #60a5fa; --b500: #3b82f6; --b600: #2563eb; --b700: #1d4ed8;
+  --a100: #fef3c7; --a700: #b45309;
+  --gr50: #f0fdf4; --gr200: #bbf7d0; --gr500: #22c55e; --gr700: #15803d;
+  --p50: #faf5ff;  --p200: #e9d5ff; --p500: #a855f7; --p700: #7e22ce;
+  --r500: #ef4444;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #1f2937;
+    --g50: #111827; --g100: #111827; --g200: #374151; --g400: #9ca3af;
+    --g500: #9ca3af; --g600: #d1d5db; --g700: #e5e7eb; --g800: #f3f4f6;
+    --s50: #374151; --s200: #4b5563; --s300: #6b7280; --s700: #e5e7eb;
+    --b50: rgba(30, 64, 175, .35); --b100: rgba(30, 64, 175, .5);
+    --b200: #3b82f6; --b300: #3b82f6; --b400: #60a5fa; --b500: #60a5fa;
+    --b600: #93c5fd; --b700: #93c5fd;
+    --a100: rgba(120, 53, 15, .4); --a700: #fcd34d;
+    --gr50: rgba(6, 78, 59, .4); --gr200: #4ade80; --gr500: #4ade80; --gr700: #86efac;
+    --p50: rgba(88, 28, 135, .4); --p200: #c084fc; --p500: #c084fc; --p700: #d8b4fe;
+    --r500: #f87171;
+  }
+  *, ::before, ::after { --tw-ring-offset-color: #111827; }
+}
