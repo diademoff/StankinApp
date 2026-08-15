@@ -1,4 +1,3 @@
-using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Caching.Memory;
@@ -174,36 +173,54 @@ static class StartupExtensions
             string teacherName,
             string startDate,
             string endDate,
-            IDataReader reader) =>
+            ScheduleService service,
+            IMemoryCache cache,
+            ILogger<Program> log) =>
         {
-            try
+            if (string.IsNullOrWhiteSpace(teacherName) ||
+                string.IsNullOrWhiteSpace(startDate)   ||
+                string.IsNullOrWhiteSpace(endDate))
             {
-                var courses = reader.GetScheduleForTeacher(teacherName, startDate, endDate);
-
-                if (!courses.Any()) return Results.NoContent();
-
-                var dtos = courses.Select(c => new CourseDto(
-                    Id: $"{c.GroupName}_{c.Dates[0].ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}_{c.StartTime.ToString("HH:mm", CultureInfo.InvariantCulture)}_{c.Subgroup ?? "all"}",
-                    Date: c.Dates[0].ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-                    StartTime: c.StartTime.ToString("HH:mm", CultureInfo.InvariantCulture),
-                    EndTime: (c.StartTime + c.Duration).ToString("HH:mm", CultureInfo.InvariantCulture),
-                    DurationMinutes: (int)c.Duration.ToDuration().TotalMinutes,
-                    GroupName: c.GroupName,
-                    Subject: c.Subject,
-                    Teacher: c.Teacher,
-                    Type: c.Type,
-                    Subgroup: c.Subgroup ?? "",
-                    Cabinet: c.Cabinet ?? "",
-                    SequencePosition: c.SequencePosition,
-                    SequenceLength: c.SequenceLength
-                ));
-
-                return Results.Ok(new ListResponse<CourseDto>(dtos));
+                log.LogWarning("Missing parameters: teacher={Teacher}, start={Start}, end={End}",
+                    teacherName, startDate, endDate);
+                return Results.BadRequest(new { error = "teacherName, startDate и endDate обязательны" });
             }
-            catch (ArgumentException ex)
+
+            if (!DateOnly.TryParseExact(startDate, "yyyy-MM-dd", out var parsedStart) ||
+                !DateOnly.TryParseExact(endDate,   "yyyy-MM-dd", out var parsedEnd))
             {
-                return Results.BadRequest(ex.Message);
+                return Results.BadRequest(new { error = "Даты должны быть в формате yyyy-MM-dd" });
             }
+
+            if (parsedEnd < parsedStart)
+                return Results.BadRequest(new { error = "endDate не может быть раньше startDate" });
+
+            var cacheKey = $"sched:teacher:{teacherName}:{startDate}:{endDate}";
+            List<CourseDto> lessons;
+
+            if (!cache.TryGetValue(cacheKey, out lessons))
+            {
+                try
+                {
+                    lessons = service.GetMergedScheduleForTeacher(teacherName, startDate, endDate).ToList();
+                    cache.Set(cacheKey, lessons, TimeSpan.FromHours(2));
+                    log.LogInformation("Fetched from DB & cached: {Key}", cacheKey);
+                }
+                catch (Exception ex)
+                {
+                    log.LogError(ex, "Error fetching schedule for {Teacher}", teacherName);
+                    return Results.Json(new { error = "Внутренняя ошибка сервера" }, statusCode: 500);
+                }
+            }
+            else
+            {
+                log.LogInformation("Served from cache: {Key}", cacheKey);
+            }
+
+            if (lessons.Count == 0)
+                return Results.NoContent();
+
+            return Results.Ok(new ListResponse<CourseDto>(lessons));
         });
 
         app.MapGet("/api/schedule/by-subject", (

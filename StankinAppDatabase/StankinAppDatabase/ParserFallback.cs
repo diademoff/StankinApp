@@ -58,95 +58,36 @@ namespace StankinAppDatabase
         {
             _reader ??= new ScheduleJsonReader(_year, _ => Array.Empty<Course>());
 
-            if (TryHandleDottedSubjects(err, out var courses)) return courses;
-            if (TryHandleAnomalyTeachers(err, out courses)) return courses;
-            if (TryHandleBothDottedSubjectsAndAnomalyTeachers(err, out courses)) return courses;
+            if (TryHandleWithFallbacks(err, out var courses)) return courses;
 
             return HandleParseError(err);
         }
 
-        private bool TryHandleDottedSubjects(ErrorParsingInfo err, out Course[] courses)
-        {
-            var foundSubject = SubjectNamesWithDots.FirstOrDefault(err.LineToParse.Contains);
-            if (foundSubject == null)
-            {
-                courses = Array.Empty<Course>();
-                return false;
-            }
-
-            try
-            {
-                courses = _reader!.ParseLessons(
-                    err.LineToParse.Replace(foundSubject, TemporarySubject),
-                    err.StartTime,
-                    err.Duration,
-                    err.GroupName,
-                    throwOnFail: true)
-                    .Select(x => x with { Subject = x.Subject == TemporarySubject ? foundSubject : x.Subject })
-                    .ToArray();
-                return true;
-            }
-            catch
-            {
-                courses = Array.Empty<Course>();
-                return false;
-            }
-        }
-
-        private bool TryHandleAnomalyTeachers(ErrorParsingInfo err, out Course[] courses)
-        {
-            var foundTeacher = AnomalyTeachers.FirstOrDefault(x => err.LineToParse.Contains(x.IncorrectName));
-            if (foundTeacher == null)
-            {
-                courses = Array.Empty<Course>();
-                return false;
-            }
-
-            try
-            {
-                courses = _reader!.ParseLessons(
-                    err.LineToParse.Replace(foundTeacher.IncorrectName, TemporaryTeacher),
-                    err.StartTime,
-                    err.Duration,
-                    err.GroupName,
-                    throwOnFail: true)
-                    .Select(x => x with { Teacher = x.Teacher == TemporaryTeacher ? foundTeacher.CorrectName : x.Teacher })
-                    .ToArray();
-                return true;
-            }
-            catch
-            {
-                courses = Array.Empty<Course>();
-                return false;
-            }
-        }
-
-        private bool TryHandleBothDottedSubjectsAndAnomalyTeachers(ErrorParsingInfo err, out Course[] courses)
+        private bool TryHandleWithFallbacks(ErrorParsingInfo err, out Course[] courses)
         {
             courses = Array.Empty<Course>();
 
-            var foundSubject = SubjectNamesWithDots.FirstOrDefault(err.LineToParse.Contains);
-            var foundTeacher = AnomalyTeachers.FirstOrDefault(x => err.LineToParse.Contains(x.IncorrectName));
-
-            if (foundSubject == null || foundTeacher == null)
+            var subject = SubjectNamesWithDots.FirstOrDefault(err.LineToParse.Contains);
+            var teacher = AnomalyTeachers.FirstOrDefault(x => err.LineToParse.Contains(x.IncorrectName));
+            if (subject == null && teacher == null)
                 return false;
+
+            var line = err.LineToParse;
+            if (subject != null) line = line.Replace(subject, TemporarySubject);
+            if (teacher != null) line = line.Replace(teacher.IncorrectName, TemporaryTeacher);
 
             try
             {
-                var tempLine = err.LineToParse
-                    .Replace(foundSubject, TemporarySubject)
-                    .Replace(foundTeacher.IncorrectName, TemporaryTeacher);
-
                 courses = _reader!.ParseLessons(
-                    tempLine,
+                    line,
                     err.StartTime,
                     err.Duration,
                     err.GroupName,
                     throwOnFail: true)
                     .Select(x => x with
                     {
-                        Subject = x.Subject == TemporarySubject ? foundSubject : x.Subject,
-                        Teacher = x.Teacher == TemporaryTeacher ? foundTeacher.CorrectName : x.Teacher
+                        Subject = x.Subject == TemporarySubject && subject != null ? subject : x.Subject,
+                        Teacher = x.Teacher == TemporaryTeacher && teacher != null ? teacher.CorrectName : x.Teacher
                     })
                     .ToArray();
                 return true;

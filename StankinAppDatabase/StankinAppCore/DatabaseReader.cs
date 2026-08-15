@@ -1,4 +1,3 @@
-using System.Globalization;
 using Microsoft.Data.Sqlite;
 using NodaTime;
 using NodaTime.Text;
@@ -9,6 +8,17 @@ public class DatabaseReader : IDataReader
 {
     private const string DateFormat = "yyyy-MM-dd";
     private const string TimeFormat = "HH:mm";
+
+    private const string SelectScheduleSql = @"
+        SELECT l.subject, t.name as teacher, l.lesson_type, r.name as room,
+               s.start_time, s.end_time, l.subgroup, g.name as group_name,
+               sd.date, sd.sequence_position, sd.sequence_length
+        FROM lessons l
+        JOIN sessions s ON l.session_id = s.id
+        JOIN groups g ON s.group_id = g.id
+        JOIN teachers t ON l.teacher_id = t.id
+        LEFT JOIN rooms r ON l.room_id = r.id
+        JOIN schedule_dates sd ON l.id = sd.lesson_id";
 
     private readonly string? _dbPath;
     private readonly SqliteConnection? _sharedConnection;
@@ -57,6 +67,14 @@ public class DatabaseReader : IDataReader
     public IEnumerable<string> GetRooms() => GetListFromTable("rooms");
     public IEnumerable<string> GetTeachers() => GetListFromTable("teachers");
 
+    private static string FormatDate(string date)
+    {
+        var result = LocalDatePattern.CreateWithInvariantCulture(DateFormat).Parse(date);
+        if (!result.Success)
+            throw new ArgumentException($"Дата в неверном формате, ожидается {DateFormat}");
+        return date;
+    }
+
     private List<Course> GetSchedule(string sql, params SqliteParameter[] parameters)
     {
         var courses = new List<Course>();
@@ -77,10 +95,10 @@ public class DatabaseReader : IDataReader
                 var duration = Period.Between(startTime, endTime);
 
                 var dateStr = reader.GetString(8);
-                if (!DateTime.TryParseExact(dateStr, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var dateFromDb))
+                var dateResult = LocalDatePattern.CreateWithInvariantCulture(DateFormat).Parse(dateStr);
+                if (!dateResult.Success)
                     throw new ArgumentException($"dateFromDb в неверном формате, ожидается {DateFormat}");
-
-                var parsedDate = LocalDate.FromDateTime(dateFromDb);
+                var parsedDate = dateResult.Value;
 
                 courses.Add(new Course
                 {
@@ -106,130 +124,57 @@ public class DatabaseReader : IDataReader
         return courses;
     }
 
+    private IEnumerable<Course> GetScheduleFor(string whereClause, SqliteParameter[] parameters)
+    {
+        var sql = $"{SelectScheduleSql} WHERE {whereClause} ORDER BY sd.date, s.start_time";
+        return GetSchedule(sql, parameters);
+    }
+
     public IEnumerable<Course> GetScheduleForGroup(string groupName, string startDate, string endDate)
     {
-        if (!DateTime.TryParseExact(startDate, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var start))
-            throw new ArgumentException($"startDate в неверном формате, ожидается {DateFormat}");
-
-        if (!DateTime.TryParseExact(endDate, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var end))
-            throw new ArgumentException($"endDate в неверном формате, ожидается {DateFormat}");
-
-        var sql = @"
-            SELECT l.subject, t.name as teacher, l.lesson_type, r.name as room,
-                   s.start_time, s.end_time, l.subgroup, g.name as group_name,
-                   sd.date, sd.sequence_position, sd.sequence_length
-            FROM lessons l
-            JOIN sessions s ON l.session_id = s.id
-            JOIN groups g ON s.group_id = g.id
-            JOIN teachers t ON l.teacher_id = t.id
-            LEFT JOIN rooms r ON l.room_id = r.id
-            JOIN schedule_dates sd ON l.id = sd.lesson_id
-            WHERE g.name = @groupName AND sd.date BETWEEN @startDate AND @endDate
-            ORDER BY sd.date, s.start_time";
-
         var parameters = new[]
         {
             new SqliteParameter("@groupName", groupName),
-            new SqliteParameter("@startDate", start.ToString(DateFormat)),
-            new SqliteParameter("@endDate", end.ToString(DateFormat))
+            new SqliteParameter("@startDate", FormatDate(startDate)),
+            new SqliteParameter("@endDate", FormatDate(endDate))
         };
-
-        return GetSchedule(sql, parameters);
+        return GetScheduleFor("g.name = @groupName AND sd.date BETWEEN @startDate AND @endDate", parameters);
     }
 
     public IEnumerable<Course> GetScheduleForRoom(string roomName, string startDate, string endDate)
     {
-        if (!DateTime.TryParseExact(startDate, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var start))
-            throw new ArgumentException($"startDate в неверном формате, ожидается {DateFormat}");
-
-        if (!DateTime.TryParseExact(endDate, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var end))
-            throw new ArgumentException($"endDate в неверном формате, ожидается {DateFormat}");
-
-        var sql = @"
-            SELECT l.subject, t.name as teacher, l.lesson_type, r.name as room,
-                   s.start_time, s.end_time, l.subgroup, g.name as group_name,
-                   sd.date, sd.sequence_position, sd.sequence_length
-            FROM lessons l
-            JOIN sessions s ON l.session_id = s.id
-            JOIN groups g ON s.group_id = g.id
-            JOIN teachers t ON l.teacher_id = t.id
-            JOIN rooms r ON l.room_id = r.id
-            JOIN schedule_dates sd ON l.id = sd.lesson_id
-            WHERE r.name = @roomName AND sd.date BETWEEN @startDate AND @endDate
-            ORDER BY sd.date, s.start_time";
-
         var parameters = new[]
         {
             new SqliteParameter("@roomName", roomName),
-            new SqliteParameter("@startDate", start.ToString(DateFormat)),
-            new SqliteParameter("@endDate", end.ToString(DateFormat))
+            new SqliteParameter("@startDate", FormatDate(startDate)),
+            new SqliteParameter("@endDate", FormatDate(endDate))
         };
-
-        return GetSchedule(sql, parameters);
+        return GetScheduleFor("r.name = @roomName AND sd.date BETWEEN @startDate AND @endDate", parameters);
     }
 
     public IEnumerable<Course> GetScheduleForTeacher(string teacherName, string startDate, string endDate)
     {
-        if (!DateTime.TryParseExact(startDate, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var start))
-            throw new ArgumentException($"startDate в неверном формате, ожидается {DateFormat}");
-
-        if (!DateTime.TryParseExact(endDate, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var end))
-            throw new ArgumentException($"endDate в неверном формате, ожидается {DateFormat}");
-
-        var sql = @"
-            SELECT l.subject, t.name as teacher, l.lesson_type, r.name as room,
-                   s.start_time, s.end_time, l.subgroup, g.name as group_name,
-                   sd.date, sd.sequence_position, sd.sequence_length
-            FROM lessons l
-            JOIN sessions s ON l.session_id = s.id
-            JOIN groups g ON s.group_id = g.id
-            JOIN teachers t ON l.teacher_id = t.id
-            LEFT JOIN rooms r ON l.room_id = r.id
-            JOIN schedule_dates sd ON l.id = sd.lesson_id
-            WHERE t.name = @teacherName AND sd.date BETWEEN @startDate AND @endDate
-            ORDER BY sd.date, s.start_time";
-
         var parameters = new[]
         {
             new SqliteParameter("@teacherName", teacherName),
-            new SqliteParameter("@startDate", start.ToString(DateFormat)),
-            new SqliteParameter("@endDate", end.ToString(DateFormat))
+            new SqliteParameter("@startDate", FormatDate(startDate)),
+            new SqliteParameter("@endDate", FormatDate(endDate))
         };
-
-        return GetSchedule(sql, parameters);
+        return GetScheduleFor("t.name = @teacherName AND sd.date BETWEEN @startDate AND @endDate", parameters);
     }
 
     public IEnumerable<Course> GetScheduleBySubject(string subjectName, string teacherName, string groupName, string startDate, string endDate)
     {
-        if (!DateTime.TryParseExact(startDate, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var start))
-            throw new ArgumentException($"startDate в неверном формате, ожидается {DateFormat}");
-
-        if (!DateTime.TryParseExact(endDate, DateFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var end))
-            throw new ArgumentException($"endDate в неверном формате, ожидается {DateFormat}");
-
-        var sql = @"
-            SELECT l.subject, t.name as teacher, l.lesson_type, r.name as room,
-                   s.start_time, s.end_time, l.subgroup, g.name as group_name,
-                   sd.date, sd.sequence_position, sd.sequence_length
-            FROM lessons l
-            JOIN sessions s ON l.session_id = s.id
-            JOIN groups g ON s.group_id = g.id
-            JOIN teachers t ON l.teacher_id = t.id
-            LEFT JOIN rooms r ON l.room_id = r.id
-            JOIN schedule_dates sd ON l.id = sd.lesson_id
-            WHERE l.subject = @subjectName AND t.name = @teacherName AND g.name = @groupName
-              AND sd.date BETWEEN @startDate AND @endDate
-            ORDER BY sd.date, s.start_time";
-
         var parameters = new[]
         {
             new SqliteParameter("@subjectName", subjectName),
             new SqliteParameter("@teacherName", teacherName),
             new SqliteParameter("@groupName", groupName),
-            new SqliteParameter("@startDate", start.ToString(DateFormat)),
-            new SqliteParameter("@endDate", end.ToString(DateFormat))
+            new SqliteParameter("@startDate", FormatDate(startDate)),
+            new SqliteParameter("@endDate", FormatDate(endDate))
         };
-
-        return GetSchedule(sql, parameters);
+        return GetScheduleFor(
+            "l.subject = @subjectName AND t.name = @teacherName AND g.name = @groupName AND sd.date BETWEEN @startDate AND @endDate",
+            parameters);
     }
 }

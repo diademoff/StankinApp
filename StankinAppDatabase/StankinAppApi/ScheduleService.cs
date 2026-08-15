@@ -1,3 +1,4 @@
+using System.Globalization;
 using StankinAppCore;
 using StankinAppApi.Dto;
 using NodaTime;
@@ -27,6 +28,13 @@ public class ScheduleService
         string startDate, string endDate)
     {
         var courses = _db.GetScheduleBySubject(subjectName, teacherName, groupName, startDate, endDate);
+        return MergeAndToDtoList(courses);
+    }
+
+    public IEnumerable<CourseDto> GetMergedScheduleForTeacher(
+        string teacherName, string startDate, string endDate)
+    {
+        var courses = _db.GetScheduleForTeacher(teacherName, startDate, endDate);
         return MergeAndToDtoList(courses);
     }
 
@@ -98,9 +106,9 @@ public class ScheduleService
 
     private static CourseDto ToDto(LessonInstance i)
     {
-        var dateStr     = $"{i.Start.Year:D4}-{i.Start.Month:D2}-{i.Start.Day:D2}";
-        var startStr    = $"{i.Start.Hour:D2}:{i.Start.Minute:D2}";
-        var endStr      = $"{i.End.Hour:D2}:{i.End.Minute:D2}";
+        var dateStr     = i.Start.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+        var startStr    = i.Start.ToString("HH:mm", CultureInfo.InvariantCulture);
+        var endStr      = i.End.ToString("HH:mm", CultureInfo.InvariantCulture);
         var durationMin = (int)(i.End - i.Start).ToDuration().TotalMinutes;
         var subgroupKey = string.IsNullOrEmpty(i.Subgroup) ? "all" : i.Subgroup;
 

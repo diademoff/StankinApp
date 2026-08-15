@@ -16,8 +16,6 @@ class Program
         app.UseCors("AllowFrontend");
         app.MapApi();
 
-        builder.WebHost.UseUrls("http://0.0.0.0:5000");
-
         app.Run();
     }
 }
