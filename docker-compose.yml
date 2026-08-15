@@ -22,7 +22,7 @@ services:
   web:
     build:
       context: .
-      dockerfile: deploy/nginx/Dockerfile
+      dockerfile: deploy/caddy/Dockerfile
     image: stankin-web:latest
     depends_on:
       - api
@@ -30,13 +30,6 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
-      - /etc/letsencrypt:/etc/letsencrypt
-      - ./deploy/nginx/html:/var/www/certbot:ro
+      - ./deploy/caddy/data:/data
+      - ./deploy/caddy/config:/config
     restart: unless-stopped
-    command: >
-      sh -c "nginx -g 'daemon off;' &
-             while true; do
-                 sleep 6h;
-                 nginx -s reload;
-             done"

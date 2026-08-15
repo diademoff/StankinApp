@@ -1,0 +1,7 @@
+stankinapp.ru {
+	encode gzip
+	root * /srv
+	try_files {path} /index.html
+	reverse_proxy /api/* api:5000
+	file_server
+}

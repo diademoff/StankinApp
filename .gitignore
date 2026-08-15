@@ -457,3 +457,8 @@ pdfparser/json/*
 pdfparser/pdf/*
 dbBuilder/
 StankinAppDatabase/StankinAppApi/schedule.db
+
+# Caddy: сертификаты и состояние (генерируются при деплое)
+deploy/caddy/data/
+deploy/caddy/config/
+

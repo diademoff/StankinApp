@@ -18,7 +18,7 @@ PWA-приложение для просмотра расписания заня
 │   ├── StankinAppApi/      # C# Web API: REST поверх SQLite
 │   └── StankinAppDatabase.Tests/
 ├── stankin-schedule/       # TypeScript PWA: Alpine.js + Tailwind
-└── deploy/                 # Nginx, Docker Compose, сертификаты
+└── deploy/                 # Caddy, Docker Compose, сертификаты
 ```
 
 ### Поток данных
@@ -179,13 +179,13 @@ dotnet test StankinAppDatabase.Tests/
 ```
 deploy/
 ├── data/           # Сюда кладём stankin.db
-├── nginx/
-│   ├── conf.d/     # Конфиг виртуального хоста
-│   ├── nginx.conf
-│   └── proxy_params
+├── caddy/
+│   ├── Caddyfile   # Конфиг: статика + прокси на API
+│   └── Dockerfile  # Сборка фронтенда + Caddy
 docker-compose.yml
 ```
 
+Сертификаты TLS (Let's Encrypt) Caddy получает и продлевает автоматически — никакого certbot и crontab. Состояние и сертификаты лежат в `deploy/caddy/data` и `deploy/caddy/config` (сгенерируются при первом запуске).
 
 ### Первичный деплой на чистый VPS (Ubuntu)
 
@@ -204,7 +204,7 @@ ufw allow 443
 
 ```bash
 git clone <repo-url> && cd StankinApp
-mkdir -p deploy/nginx/conf.d deploy/certbot/www deploy/certbot/conf data
+mkdir -p deploy/caddy/data deploy/caddy/config deploy/data
 ```
 
 #### 3. Скопировать базу данных
@@ -213,44 +213,14 @@ mkdir -p deploy/nginx/conf.d deploy/certbot/www deploy/certbot/conf data
 scp /local/path/stankin.db stankin@<server-ip>:/home/stankin/StankinApp/deploy/data/
 ```
 
-#### 4. Получить SSL-сертификат (Let's Encrypt)
-
-```bash
-# Шаг 1: временно закомментировать HTTPS-блок в deploy/nginx/conf.d/default.conf
-# Шаг 2: поднять только Nginx
-docker compose up -d web
-
-# Шаг 3: получить сертификат через webroot
-docker run --rm -it \
-  -v "/etc/letsencrypt:/etc/letsencrypt" \
-  -v "$(pwd)/deploy/nginx/html:/var/www/certbot" \
-  certbot/certbot certonly --webroot \
-  -w /var/www/certbot -d stankinapp.ru \
-  --email your@email.ru --agree-tos
-
-# Шаг 4: вернуть HTTPS-блок в nginx конфиг
-# Шаг 5: пробросить сертификаты
-sudo ln -sf /etc/letsencrypt ./deploy/certbot/conf
-```
-
-#### 5. Автопродление сертификата
-
-```bash
-crontab -e
-# Добавить строку:
-0 3 * * * docker run --rm \
-  -v "/etc/letsencrypt:/etc/letsencrypt" \
-  -v "/home/stankin/StankinApp/deploy/nginx/html:/var/www/certbot" \
-  certbot/certbot renew --quiet && \
-  docker exec stankinapp_web_1 nginx -s reload
-```
-
-#### 6. Запуск
+#### 4. Запуск
 
 ```bash
 ./deploy.sh
 docker compose up -d --build
 ```
+
+При первом старте Caddy выпустит сертификаты для `stankinapp.ru` (домен должен указывать на этот сервер).
 
 ---
 
@@ -335,5 +305,5 @@ HTTP-статусы: `200` — данные есть, `204` — пар за пе
 | Мониторинг | OpenTelemetry, Serilog | Apache 2.0 |
 | Фронтенд | Alpine.js, Tailwind CSS, Vite | MIT |
 | PWA | vite-plugin-pwa, Workbox | MIT |
-| Деплой | Docker, Nginx | Apache 2.0 / BSD |
+| Деплой | Docker, Caddy | Apache 2.0 |
 | API-тесты | Bruno | MIT |
