@@ -321,24 +321,53 @@ export function scheduleComponent(
     hasSchedule(dateStr: string)  { return mem.hasDay(dateStr); },
     isSelectedDate(dateStr: string) { return dateStr === DateUtils.toIsoDate(new Date()); },
 
+    typeCategory(typeRaw: string) {
+      const t = (typeRaw || '').toLowerCase();
+      if (t.includes('лекц')) return 'lecture';
+      if (t.includes('лаб'))  return 'lab';
+      if (t.includes('сем'))  return 'seminar';
+      return null;
+    },
+
+    getLessonIndicators(date: string) {
+      const lessons = this.groupedSchedule[date] ?? [];
+      const counts = { lecture: 0, seminar: 0, lab: 0 };
+      for (const l of lessons) {
+        const cat = this.typeCategory(l.type);
+        if (cat) counts[cat]++;
+      }
+      const indicators: { type: string; label: string; count: number }[] = [];
+      if (counts.lecture) indicators.push({ type: 'lecture', label: 'Лекции', count: counts.lecture });
+      if (counts.seminar) indicators.push({ type: 'seminar', label: 'Семинары', count: counts.seminar });
+      if (counts.lab) indicators.push({ type: 'lab', label: 'Лабораторные', count: counts.lab });
+      return indicators;
+    },
+
+    indicatorColor(type: string) {
+      return { lecture: 'bg-blue-500', seminar: 'bg-purple-500', lab: 'bg-green-500' }[type] ?? 'bg-gray-400';
+    },
+
+    dateAriaLabel(date: string) {
+      const parts = this.getLessonIndicators(date).map(i => `${i.label}: ${i.count}`);
+      const base = this.formatDate(date);
+      return parts.length ? `${base}. ${parts.join(', ')}.` : base;
+    },
+
     lessonKey(date: string, l: Lesson) {
       return l.id ?? `${date}-${l.subject}-${l.startTime}-${l.subgroup ?? ''}`;
     },
 
     typeBadgeClass(typeRaw: string) {
-      const t = (typeRaw || '').toLowerCase();
-      if (t.includes('лекц')) return 'bg-blue-50 text-blue-700 ring-blue-200';
-      if (t.includes('лаб'))  return 'bg-green-50 text-green-700 ring-green-200';
-      if (t.includes('сем'))  return 'bg-purple-50 text-purple-700 ring-purple-200';
-      return 'bg-gray-50 text-gray-700 ring-gray-200';
+      const soft = {
+        lecture: 'bg-blue-50 text-blue-700 ring-blue-200',
+        seminar: 'bg-purple-50 text-purple-700 ring-purple-200',
+        lab: 'bg-green-50 text-green-700 ring-green-200',
+      };
+      return soft[this.typeCategory(typeRaw) ?? ''] ?? 'bg-gray-50 text-gray-700 ring-gray-200';
     },
 
     typeDotBg(typeRaw: string) {
-      const t = (typeRaw || '').toLowerCase();
-      if (t.includes('лекц')) return 'bg-blue-500';
-      if (t.includes('лаб'))  return 'bg-green-500';
-      if (t.includes('сем'))  return 'bg-purple-500';
-      return 'bg-gray-400';
+      return this.indicatorColor(this.typeCategory(typeRaw) ?? '');
     },
 
     formatCabinet(cab?: string) {

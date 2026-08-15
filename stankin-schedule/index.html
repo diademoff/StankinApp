@@ -272,10 +272,20 @@
                     <div class="flex justify-center gap-2 md:gap-3 px-2">
                       <template x-for="date in range" :key="date">
                         <button @click="onDateClick(date)"
-                          class="inline-flex select-none items-center justify-center w-12 h-10 px-1 py-2 md:w-14 md:h-12 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm md:text-base font-medium shadow-sm transition-transform duration-150 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 disabled:opacity-45 disabled:cursor-not-allowed"
+                          class="inline-flex select-none flex-col items-center justify-center gap-1 w-12 h-14 px-1 md:w-14 md:h-16 rounded-xl border border-slate-200 bg-white text-slate-700 text-sm md:text-base font-medium shadow-sm transition-transform duration-150 hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 disabled:opacity-45 disabled:cursor-not-allowed"
                           :class="isSelectedDate(date) ? 'bg-blue-50 border-blue-300 text-blue-700 shadow ring-1 ring-inset ring-blue-300' : ''"
-                          :disabled="!hasSchedule(date) && loading">
-                          <span class="tabular-nums font-mono tracking-tight" x-text="formatDateShort(date)"></span>
+                          :disabled="!hasSchedule(date) && loading"
+                          :aria-label="dateAriaLabel(date)"
+                          :title="dateAriaLabel(date)">
+                          <span class="tabular-nums font-mono tracking-tight leading-none" x-text="formatDateShort(date)"></span>
+                          <template x-if="getLessonIndicators(date).length > 0">
+                            <div class="flex items-center justify-center gap-[3px]">
+                              <template x-for="ind in getLessonIndicators(date)" :key="ind.type">
+                                <span :class="indicatorColor(ind.type) + ' flex h-[11px] min-w-[11px] items-center justify-center rounded-full px-0.5 text-[7px] font-semibold text-white'"
+                                  x-text="ind.count === 1 ? '' : ind.count"></span>
+                              </template>
+                            </div>
+                          </template>
                         </button>
                       </template>
                     </div>
