@@ -10,6 +10,7 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.jpg" />
   <link rel="apple-touch-icon-precomposed" href="apple-touch-icon.jpg" />
   <link rel="stylesheet" href="/src/input.css">
+  <script type="module" src="/src/about.ts"></script>
 </head>
 <body>
   <!-- Yandex.Metrika counter -->
@@ -33,8 +34,8 @@
       <!-- Title -->
       <header class="text-center mb-6">
         <h1 class="text-3xl font-bold">Stankin App</h1>
-        <p class="text-sm text-gray-500">PWA v2 • API v2</p>
-        <p class="text-sm text-gray-500">Расписание от 15.03.2026</p>
+        <p id="about-version" class="text-sm text-gray-500"></p>
+        <p id="about-schedule-date" class="text-sm text-gray-500"></p>
       </header>
 
       <!-- Description -->
@@ -79,47 +80,16 @@
       <!-- Contacts -->
       <section class="bg-white rounded-2xl shadow p-4 sm:p-6 space-y-2 mb-6">
         <h2 class="text-xl font-semibold">Контакты</h2>
-        <p>По любым вопросам: <a href="mailto:stankinapp@yandex.ru"
-            class="text-blue-600 hover:underline">stankinapp@yandex.ru</a></p>
+        <p>По любым вопросам: <a id="about-email" href=""
+            class="text-blue-600 hover:underline"></a></p>
 
         <div class="overflow-x-auto py-4">
-          <pre class="text-xs bg-gray-100 p-2 rounded whitespace-pre-wrap" style="overflow-x: scroll;">
------BEGIN PGP PUBLIC KEY BLOCK-----
-
-mQENBGixOB0BCACslgDmMMb9SvIlqhJKTwbda40ENnRxe9ipE4Qe45Z/+vffLbFf
-Tf5LY9iDWZTzkMU8V84gdHM5smnTz1ouR+YQDOazWuctI/ohnaJtGmgdYV/A/hSZ
-iqQdZUcM6rnFJlVHsHwRGVM+BqccsmF4xQ3XfarYJqCk3WXGUB2NVGMzHR1FPdkA
-qykxOnDAna8JFZMl9M2+M3ipGd1uLUzOybd/1KOgUJCz7Y536Qc/93P6nMxvYfrR
-iuOA9NkWKZGKo4++in2tg3myNQaWv1SaZLy/f2JTSc4fVfEZzel6xeEJC1udLPxG
-Ay2cuYE5pVJWtPhm9R391YFeBqfVcqRJ5DDNABEBAAG0IVN0YW5raW5BcHAgPHN0
-YW5raW5hcHBAeWFuZGV4LnJ1PokBTgQTAQoAOBYhBOq8KfeAq9fTtEIZm8cqt+KZ
-L3D3BQJosTgdAhsDBQsJCAcCBhUKCQgLAgQWAgMBAh4BAheAAAoJEMcqt+KZL3D3
-nTQH/jfhLTI/xU8IJamct9IcHGpaelh3SofAlvnv+QYWgIuyOr0B+k6jdxajJM/b
-OAUyZ2jVxNHDAYisKp3LOKMGy4tsn8Zfyc/lqR3qCXQhJcvjFrQkSUjxrQ7WAyGc
-IWY1vVzFktz5BkZkO15yisblFQBFLvCYR922mlR3hhesnoYVYyHeOuvrwwxet9ty
-5+FToH39RBwWSScogrcfqD89hS4s9B/iagTWXHgAVUz2kGPWAzP6FFQCG60Gssa4
-YKvaInovMowggggcPN4Luiw6oNqqGvGy/fMjPwfYgHs86G5YtO4eaoyhA3zS0a7M
-LqNukj1ZeDdwq08b59xJmZy5kwi5AQ0EaLE4HQEIAOX1zuoEbL0eXqaRUT7bGle1
-3sR9wg2Lspzth4VFSKCypflsyN5DnhfDiZ4/ux8VKxG4M5ieaKy6UKV0/RuDoW0d
-YF96MlDwu1kx3RB7y6rq24dHEoTvgYzbUlWGIthZ55yZJpxw8ZXiN/Rb3yiOo1zk
-YfrHt9u/9nNB5e3Q7fKH6QGTW3H5MDARcVNE2yGrnqX+Ff7lkjqIm67DqzGhC57X
-JS3hy8vK8K+kTtY0wJB61sVxYC+LoZes4hURxwNglW86GyJQDiFAkpUmrT7/PmUz
-Jq1OZumCRfbJ6pyyUbQxrRYHKbpyJe9jeuKBVxmKQcDPVH9FT99L//TnJ6YPQDkA
-EQEAAYkBNgQYAQoAIBYhBOq8KfeAq9fTtEIZm8cqt+KZL3D3BQJosTgdAhsMAAoJ
-EMcqt+KZL3D3whYH/1FkRy3L27SiczpMuQU9MBkf1tdG2yD/MIGrNwgjxuo2TmUr
-O7l7OaQ9yxT8jZjONtRQqyp6sxTu61/WXC3yY3rD0JARMq9G7HZOK9GPGp0YGFQD
-dxvA0VlrEONxqWY6I/Ihr5WS+eTS8yK2wmnJ+yKJqJ3ReOI4JpEKy3o2dcnUTFWZ
-wk3t8/5MI4CWOXrefwgUCSRfh5dlEwUgww3iAB22nB8JtNKvj2RSzjUQFOeDfSJP
-AtfCgXSzwzihh+M3tolvKnfox7lHdqBiQYOSc9mN3ANdbrrUP3km0vbgbTPVsuLw
-iVqTQOLolrPrMsNg9B90OLpv1F2eRrhqATlbloM=
-=YKKu
------END PGP PUBLIC KEY BLOCK-----
-  </pre>
+          <pre id="about-pgp-key" class="text-xs bg-gray-100 p-2 rounded whitespace-pre-wrap" style="overflow-x: scroll;"></pre>
         </div>
 
         <p class="text-sm text-gray-600">
           PGP fingerprint: <code
-            class="bg-gray-100 px-1 rounded">EABC 29F7 80AB D7D3 B442  199B C72A B7E2 992F 70F7</code>
+            id="about-fingerprint" class="bg-gray-100 px-1 rounded"></code>
         </p>
       </section>
 
@@ -130,9 +100,15 @@ iVqTQOLolrPrMsNg9B90OLpv1F2eRrhqATlbloM=
         <p>Анонимные данные об ошибках могут передаваться и обрабатываться на сервере в обезличенной форме.</p>
       </section>
 
+      <!-- Back to schedule -->
+      <div class="text-center">
+        <a href="/"
+          class="inline-block bg-blue-600 text-white font-medium py-3 px-8 rounded-xl shadow hover:bg-blue-700 transition">Перейти к расписанию</a>
+      </div>
+
       <!-- Footer -->
       <footer class="text-center text-sm text-gray-500 pt-6">
-        © 2025, StankinApp. Все права защищены.
+        <span id="about-copyright"></span>
       </footer>
     </div>
   </div>
