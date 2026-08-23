@@ -9,11 +9,11 @@ class Sector:
     hspan: bool
     vspan: bool
 
-    # 1 - '8:30 - 10:10'
-    # 2 - '10:20 - 12:00'
-    # 3 - '12:20 - 14:00'
-    # 4 - '14:10 - 15:50'
-    # 5 - '16:00 - 17:40'
+    # 1 - '8:30 - 10:05'
+    # 2 - '10:15 - 11:50'
+    # 3 - '12:20 - 13:55'
+    # 4 - '14:05 - 15:40'
+    # 5 - '15:50 - 17:25'
     # 6 - '18:00 - 19:30'
     # 7 - '19:40 - 21:10'
     # 8 - '21:20 - 22:50'
@@ -90,11 +90,11 @@ daysOfWeek: dict = {
 }
 
 sectorTime: dict = {
-    1: "8:30-10:10",
-    2: "10:20-12:00",
-    3: "12:20-14:00",
-    4: "14:10-15:50",
-    5: "16:00-17:40",
+    1: "8:30-10:05",
+    2: "10:15-11:50",
+    3: "12:20-13:55",
+    4: "14:05-15:40",
+    5: "15:50-17:25",
     6: "18:00-19:30",
     7: "19:40-21:10",
     8: "21:20-22:50",
@@ -118,16 +118,7 @@ def extractFinalData(cells):
         # sorted by time
         todaySectors = sorted([s for s in sectors if s.dayOfWeek == day], key=lambda s: s.time)
 
-        todayTimeTable = {
-            "8:30-10:10": [],
-            "10:20-12:00": [],
-            "12:20-14:00": [],
-            "14:10-15:50": [],
-            "16:00-17:40": [],
-            "18:00-19:30": [],
-            "19:40-21:10": [],
-            "21:20-22:50": []
-        }
+        todayTimeTable = {timeStr: [] for timeStr in sectorTime.values()}
         for s in todaySectors:
             timeStr: str = sectorTime[s.time]
             todayTimeTable[timeStr].append(s.text)
@@ -151,6 +142,7 @@ def extractByFilename(filename):
         json.dump(finalData, f, ensure_ascii=False, indent=4)
 
 # https://edu.stankin.ru/course/view.php?id=11557
+# https://edu.stankin.ru/course/view.php?id=11119
 print("Укажите путь к папке с pdf файлами: ")
 folder: str = input()
 filenames = os.listdir(folder)
