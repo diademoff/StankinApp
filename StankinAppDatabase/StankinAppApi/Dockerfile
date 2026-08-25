@@ -23,7 +23,6 @@ RUN mkdir -p /app/data
 ENV ASPNETCORE_URLS=http://+:5000
 EXPOSE 5000
 
-# запуск под uid/gid без имени
-USER 1000:1000
-
+# контейнер запускается от root — доска пишет board.db в бинд-маунт deploy/data,
+# чьи права владения на сервере не гарантируются для uid 1000 (иначе SQLite Error 14)
 ENTRYPOINT ["./StankinAppApi"]

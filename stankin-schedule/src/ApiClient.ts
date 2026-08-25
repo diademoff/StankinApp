@@ -59,4 +59,63 @@ export class ApiClient {
     const response = await this.fetchJson(url);
     return response?.items ?? [];
   }
+
+  // ==== Доска ====
+
+  async getThreads(page: number): Promise<any[]> {
+    const response = await this.fetchJson(`${this.base}/api/board/threads?page=${page}`);
+    return response?.items ?? [];
+  }
+
+  async getThread(threadId: number): Promise<any> {
+    return await this.fetchJson(`${this.base}/api/board/threads/${threadId}`);
+  }
+
+  async createThread(text: string, captchaToken: string): Promise<any> {
+    return await this.fetchJson(`${this.base}/api/board/threads`, {
+      method: 'POST',
+      body: JSON.stringify({ text, captchaToken }),
+    });
+  }
+
+  async createReply(
+    threadId: number, text: string, captchaToken: string, parentId: number | null, sage: boolean
+  ): Promise<any> {
+    return await this.fetchJson(`${this.base}/api/board/threads/${threadId}/posts`, {
+      method: 'POST',
+      body: JSON.stringify({ text, captchaToken, parentId, sage }),
+    });
+  }
+
+  async reportPost(postId: number): Promise<void> {
+    await this.fetchJson(`${this.base}/api/board/posts/${postId}/report`, { method: 'POST' });
+  }
+
+  // ==== Модерация ====
+
+  private async adminRequest(url: string, secret: string, method: string = 'GET', body?: any): Promise<any> {
+    const headers = { 'X-Admin-Secret': secret } as any;
+    return await this.fetchJson(url, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  }
+
+  async adminGetReports(secret: string): Promise<any[]> {
+    const response = await this.adminRequest(`${this.base}/api/admin/reports`, secret);
+    return response?.items ?? [];
+  }
+
+  async adminDeletePost(postId: number, secret: string): Promise<void> {
+    await this.adminRequest(`${this.base}/api/admin/posts/${postId}`, secret, 'DELETE');
+  }
+
+  async adminDismissReports(postId: number, secret: string): Promise<void> {
+    await this.adminRequest(`${this.base}/api/admin/reports/${postId}/dismiss`, secret, 'POST');
+  }
+
+  async adminBan(ipHash: string, secret: string): Promise<void> {
+    await this.adminRequest(`${this.base}/api/admin/ban`, secret, 'POST', { ipHash });
+  }
 }

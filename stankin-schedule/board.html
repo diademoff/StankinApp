@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Доска</title>
+  <meta name="theme-color" content="#4A90E2">
+  <meta name="theme-color" content="#111827" media="(prefers-color-scheme: dark)">
+  <link rel="apple-touch-icon" href="apple-touch-icon.jpg">
+  <link rel="stylesheet" href="/src/input.css">
+  <script src="https://smartcaptcha.cloud.yandex.ru/captcha.js" defer></script>
+  <script type="module" src="/src/boardMain.ts"></script>
+</head>
+
+<body class="bg-gray-100 text-gray-800" x-data="boardApp" x-init="init()">
+  <!-- Yandex.Metrika counter -->
+  <script type="text/javascript">
+    (function (m, e, t, r, i, k, a) {
+      m[i] = m[i] || function () { (m[i].a = m[i].a || []).push(arguments) };
+      m[i].l = 1 * new Date();
+      for (var j = 0; j < document.scripts.length; j++) { if (document.scripts[j].src === r) { return; } }
+      k = e.createElement(t), a = e.getElementsByTagName(t)[0], k.async = 1, k.src = r, a.parentNode.insertBefore(k, a)
+    })(window, document, 'script', 'https://mc.yandex.ru/metrika/tag.js?id=103946021', 'ym');
+    ym(103946021, 'init', { ssr: true, webvisor: true, clickmap: true, ecommerce: "dataLayer", accurateTrackBounce: true, trackLinks: true });
+  </script>
+  <noscript>
+    <div><img src="https://mc.yandex.ru/watch/103946021" style="position:absolute; left:-9999px;" alt="" /></div>
+  </noscript>
+  <!-- /Yandex.Metrika counter -->
+  <div class="min-h-screen max-w-xl mx-auto px-4 py-6 pb-40">
+
+    <header class="flex items-center justify-between mb-4">
+      <h1 class="text-xl font-bold">
+        <template x-if="view === 'list'"><span>Доска</span></template>
+        <template x-if="view === 'thread'">
+          <span>
+            <button @click="backToList()" class="text-blue-600 mr-1">←</button>
+            Тред #<span x-text="thread?.id"></span>
+          </span>
+        </template>
+      </h1>
+      <div class="flex gap-3 text-sm">
+        <a href="/" class="text-gray-500 hover:text-blue-600">Расписание</a>
+        <a href="/admin.html" class="text-gray-500 hover:text-blue-600">Админ</a>
+      </div>
+    </header>
+
+    <p x-show="error" class="text-red-500 text-sm mb-3" x-text="error"></p>
+
+    <!-- ===== СПИСОК ТРЕДОВ ===== -->
+    <template x-if="view === 'list'">
+      <div class="space-y-3">
+        <template x-if="loading && threads.length === 0">
+          <p class="text-center text-gray-500 py-6">Загрузка…</p>
+        </template>
+        <template x-if="!loading && threads.length === 0">
+          <p class="text-center text-gray-500 py-6">Пока пусто. Создайте первый тред ниже.</p>
+        </template>
+        <template x-for="t in threads" :key="t.id">
+          <div @click="openThread(t.id)"
+            class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-4 cursor-pointer hover:shadow-md transition">
+            <div class="text-sm font-medium text-gray-700 whitespace-pre-wrap break-words" x-text="t.op.text"></div>
+            <div class="text-xs text-gray-500 mt-1">
+              Ответов: <span x-text="t.replyCount"></span> · Обновлён:
+              <span x-text="new Date(t.updatedAt).toLocaleString()"></span>
+            </div>
+            <template x-if="t.lastPosts.length > 0">
+              <div class="mt-3 space-y-1.5 border-t border-gray-100 pt-2">
+                <template x-for="p in t.lastPosts" :key="p.id">
+                  <div class="text-sm text-gray-600" x-html="formatText(p.text)"></div>
+                </template>
+              </div>
+            </template>
+          </div>
+        </template>
+        <template x-if="hasMore && !loading">
+          <button @click="loadMore()" class="w-full py-2 text-blue-600 text-sm hover:underline">Следующая
+            страница</button>
+        </template>
+      </div>
+    </template>
+
+    <!-- ===== ПРОСМОТР ТРЕДА ===== -->
+    <template x-if="view === 'thread'">
+      <div class="space-y-3">
+        <template x-if="loading">
+          <p class="text-center text-gray-500 py-6">Загрузка…</p>
+        </template>
+        <template x-for="post in thread?.posts || []" :key="post.id">
+          <div :id="'post-' + post.id" class="bg-white rounded-2xl shadow-sm ring-1 ring-gray-200 p-4"
+            :style="'margin-left:' + depthOf(post) * 16 + 'px'">
+            <div class="flex items-center justify-between text-xs text-gray-500 mb-1">
+              <span class="font-semibold text-gray-700">#<span x-text="post.id"></span>
+                <template x-if="post.parentId != null">
+                  <a :href="'#post-' + post.parentId" class="text-blue-600 ml-1">→ #<span
+                      x-text="post.parentId"></span></a>
+                </template>
+              </span>
+              <span x-text="new Date(post.createdAt).toLocaleString()"></span>
+            </div>
+            <div class="text-sm whitespace-pre-wrap break-words" x-html="formatText(post.text)"></div>
+            <div class="mt-2 flex gap-3 text-xs text-gray-500">
+              <button @click="setReplyParent(post.id)" class="hover:text-blue-600"
+                x-text="replyParentId === post.id ? 'Отмена' : 'Ответить'"></button>
+              <button @click="report(post.id)" class="hover:text-red-500">Жалоба</button>
+            </div>
+          </div>
+        </template>
+      </div>
+    </template>
+
+    <!-- ===== ФОРМА ===== -->
+    <div class="sticky bottom-0 mt-6 bg-gray-100 pt-3">
+      <form @submit.prevent="submit()" class="bg-white rounded-2xl shadow-md ring-1 ring-gray-200 p-4 space-y-3">
+        <p class="text-sm font-medium" x-text="replyLabel"></p>
+        <p x-show="view === 'thread' && replyParentId" class="text-xs text-gray-500">
+          Ответ на пост #<span x-text="replyParentId"></span>
+        </p>
+        <textarea x-model="postText" rows="4" maxlength="4000"
+          class="w-full rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          placeholder="Текст сообщения"></textarea>
+        <div x-ref="captcha" style="height: 100px"></div>
+        <div class="flex items-center justify-between gap-3">
+          <label x-show="view === 'thread'" class="flex items-center gap-2 text-sm text-gray-600">
+            <input type="checkbox" x-model="sage" class="rounded border-gray-300"> Sage (не поднимать тред)
+          </label>
+          <button type="submit" :disabled="loading"
+            class="px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            x-text="loading ? 'Отправка…' : 'Отправить'"></button>
+        </div>
+      </form>
+    </div>
+
+  </div>
+</body>
+
+</html>

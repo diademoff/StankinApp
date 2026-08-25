@@ -8,6 +8,10 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://0.0.0.0:5000
       - Database__Path=/app/data/schedule.db
+      - Board__DbPath=/app/data/board.db
+      - GeoIp__DbPath=/app/data/GeoLite2-Country.mmdb
+      - Moderator__Secret=${Moderator__Secret}
+      - Captcha__ServerSecret=${Captcha__Server__Secret}
     volumes:
       - ./deploy/data:/app/data
     restart: unless-stopped

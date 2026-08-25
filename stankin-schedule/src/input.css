@@ -89,3 +89,10 @@
     transform: rotate(-360deg);
   }
 }
+
+/* Доска: подсветка цитируемого поста при переходе по >>N */
+[id^="post-"]:target { animation: board-flash 1.6s ease-out; }
+@keyframes board-flash {
+  from { background-color: var(--b200); }
+  to   { background-color: transparent; }
+}

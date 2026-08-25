@@ -5,6 +5,8 @@ module.exports = {
   content: [
     './index.html',
     './about.html',
+    './board.html',
+    './admin.html',
     './src/**/*.{ts,js,tsx,jsx}'
   ],
   theme: {

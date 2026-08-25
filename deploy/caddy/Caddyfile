@@ -1,7 +1,16 @@
 stankinapp.ru {
 	encode gzip
-	root * /srv
-	try_files {path} /index.html
-	reverse_proxy /api/* api:5000
-	file_server
+
+	@api {
+		path /api/*
+	}
+	handle @api {
+		reverse_proxy api:5000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
 }

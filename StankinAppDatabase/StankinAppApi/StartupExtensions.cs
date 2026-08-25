@@ -3,6 +3,7 @@ using System.Text.Json.Serialization;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Caching.Memory;
 using Serilog;
+using StankinAppApi.Board;
 using StankinAppApi.Dto;
 using StankinAppCore;
 
@@ -15,8 +16,6 @@ static class StartupExtensions
         path.StartsWithSegments("/api/groups") ||
         path.StartsWithSegments("/api/teachers") ||
         path.StartsWithSegments("/api/rooms");
-<<<<<<< Updated upstream
-=======
 
     static bool ScheduleDbReady(string dbPath)
     {
@@ -41,10 +40,9 @@ static class StartupExtensions
 
     const int MaxPostLength = 4000;
 
->>>>>>> Stashed changes
     static string[] AvailableIp =
     [
-      "stankinapp.ru"
+      "https://stankinapp.ru"
     ];
 
     public static void ConfigureLogging(this WebApplicationBuilder builder)
@@ -115,10 +113,20 @@ static class StartupExtensions
         }
         builder.Services.AddSingleton<ScheduleService>();
 
+        var boardDbPath = configuration.GetValue<string>("Board:DbPath") ?? "data/board.db";
+        var absoluteBoardDbPath = Path.IsPathRooted(boardDbPath)
+            ? boardDbPath
+            : Path.Combine(builder.Environment.ContentRootPath, boardDbPath);
+        var boardRepo = new BoardRepository(absoluteBoardDbPath);
+        boardRepo.EnsureSchema();
+        builder.Services.AddSingleton(boardRepo);
+
         var geoDbPath = configuration.GetValue<string>("GeoIp:DbPath") ?? "data/GeoLite2-Country.mmdb";
         var absoluteGeoDbPath = Path.IsPathRooted(geoDbPath)
             ? geoDbPath
             : Path.Combine(builder.Environment.ContentRootPath, geoDbPath);
+        builder.Services.AddSingleton(new GeoIpService(absoluteGeoDbPath));
+        builder.Services.AddSingleton<CaptchaService>();
         builder.Services.AddHttpClient();
     }
 
@@ -326,6 +334,120 @@ static class StartupExtensions
                 return Results.NoContent();
 
             return Results.Ok(new ListResponse<CourseDto>(lessons));
+        });
+    }
+
+    public static void MapBoardApi(this WebApplication app)
+    {
+        var bumpLimit = app.Configuration.GetValue<int>("Board:BumpLimit", 50);
+        var pageSize = app.Configuration.GetValue<int>("Board:PageSize", 20);
+
+        app.Use(async (ctx, next) =>
+        {
+            if (ctx.Request.Path.StartsWithSegments("/api/admin"))
+            {
+                var secret = app.Configuration.GetValue<string>("Moderator:Secret");
+                var provided = ctx.Request.Headers["X-Admin-Secret"].FirstOrDefault();
+                if (string.IsNullOrEmpty(secret) || !string.Equals(provided, secret, StringComparison.Ordinal))
+                {
+                    ctx.Response.StatusCode = StatusCodes.Status401Unauthorized;
+                    await ctx.Response.WriteAsJsonAsync(new { error = "Unauthorized" });
+                    return;
+                }
+            }
+            await next();
+        });
+
+        app.MapGet("/api/board/threads", (int? page, BoardRepository repo) =>
+        {
+            var p = Math.Max(1, page ?? 1);
+            var threads = repo.GetThreads(p, pageSize);
+            return Results.Ok(new ListResponse<ThreadSummaryDto>(threads.Select(t =>
+                new ThreadSummaryDto(t.Op.Id, BoardMapper.ToDto(t.Op), t.ReplyCount, t.Op.UpdatedAt,
+                    t.LastReplies.Select(BoardMapper.ToDto).ToList()))));
+        });
+
+        app.MapGet("/api/board/threads/{threadId:long}", (long threadId, BoardRepository repo) =>
+        {
+            var posts = repo.GetThread(threadId);
+            if (posts.Count == 0)
+                return Results.NotFound();
+            return Results.Ok(new ThreadDetailDto(threadId, posts.Select(BoardMapper.ToDto).ToList()));
+        });
+
+        app.MapPost("/api/board/threads",
+            async (BoardRequest req, HttpContext ctx, BoardRepository repo, GeoIpService geo, CaptchaService captcha) =>
+        {
+            var forbidden = BoardGuard.CheckPostAllowed(ctx, repo, geo);
+            if (forbidden != null) return forbidden;
+            if (req == null || string.IsNullOrWhiteSpace(req.Text))
+                return Results.BadRequest(new { error = "Пустое сообщение" });
+            if (req.Text.Length > MaxPostLength)
+                return Results.BadRequest(new { error = $"Сообщение не длиннее {MaxPostLength} символов" });
+
+            var ip = BoardGuard.GetClientIp(ctx);
+            var (ok, err) = await captcha.ValidateAsync(req.CaptchaToken, ip);
+            if (!ok) return Results.BadRequest(new { error = err });
+
+            var post = repo.CreateThread(req.Text.Trim(), BoardGuard.HashIp(ip));
+            return Results.Created($"/api/board/threads/{post.Id}", BoardMapper.ToDto(post));
+        });
+
+        app.MapPost("/api/board/threads/{threadId:long}/posts",
+            async (long threadId, BoardRequest req, HttpContext ctx, BoardRepository repo, GeoIpService geo, CaptchaService captcha) =>
+        {
+            var forbidden = BoardGuard.CheckPostAllowed(ctx, repo, geo);
+            if (forbidden != null) return forbidden;
+            if (req == null || string.IsNullOrWhiteSpace(req.Text))
+                return Results.BadRequest(new { error = "Пустое сообщение" });
+            if (req.Text.Length > MaxPostLength)
+                return Results.BadRequest(new { error = $"Сообщение не длиннее {MaxPostLength} символов" });
+
+            var ip = BoardGuard.GetClientIp(ctx);
+            var (ok, err) = await captcha.ValidateAsync(req.CaptchaToken, ip);
+            if (!ok) return Results.BadRequest(new { error = err });
+
+            try
+            {
+                var (post, _) = repo.AddReply(threadId, req.ParentId, req.Text.Trim(), BoardGuard.HashIp(ip), req.Sage, bumpLimit);
+                return Results.Created($"/api/board/threads/{threadId}#post-{post.Id}", BoardMapper.ToDto(post));
+            }
+            catch (KeyNotFoundException)
+            {
+                return Results.NotFound(new { error = "Тред не найден" });
+            }
+            catch (ArgumentException ex)
+            {
+                return Results.BadRequest(new { error = ex.Message });
+            }
+        });
+
+        app.MapPost("/api/board/posts/{postId:long}/report", (long postId, HttpContext ctx, BoardRepository repo) =>
+        {
+            if (BoardGuard.IsReportRateLimited(BoardGuard.GetClientIp(ctx)))
+                return Results.Json(new { error = "Слишком частые жалобы" }, statusCode: 429);
+            return repo.Report(postId) ? Results.NoContent() : Results.NotFound();
+        });
+
+        app.MapGet("/api/admin/reports", (BoardRepository repo) =>
+        {
+            var reports = repo.GetReports();
+            return Results.Ok(new ListResponse<ReportDto>(reports.Select(p =>
+                new ReportDto(p.Id, p.ThreadId, p.Text, p.ReportCount, p.IpHash, p.CreatedAt))));
+        });
+
+        app.MapDelete("/api/admin/posts/{postId:long}", (long postId, BoardRepository repo) =>
+            repo.SoftDelete(postId) ? Results.NoContent() : Results.NotFound());
+
+        app.MapPost("/api/admin/reports/{postId:long}/dismiss", (long postId, BoardRepository repo) =>
+            repo.DismissReports(postId) ? Results.NoContent() : Results.NotFound());
+
+        app.MapPost("/api/admin/ban", (BanRequest req, BoardRepository repo) =>
+        {
+            if (string.IsNullOrWhiteSpace(req?.IpHash))
+                return Results.BadRequest(new { error = "ipHash обязателен" });
+            repo.Ban(req.IpHash.Trim());
+            return Results.NoContent();
         });
     }
 }

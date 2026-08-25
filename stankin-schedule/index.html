@@ -266,9 +266,14 @@
               :class="viewMode === 'teacher' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'"
               x-text="viewMode === 'teacher' ? '🎓 Преп.' : '👥 Группа'"></span>
           </h1>
-          <a href="https://lk.stankin.ru"
-            class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-700 shadow-sm hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 shrink-0"
-            aria-label="Посмотреть оценки">📊</a>
+          <div class="flex items-center gap-2 shrink-0">
+            <a href="/board.html"
+              class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-700 shadow-sm hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 shrink-0"
+              aria-label="Доска" title="Доска">💬</a>
+            <a href="https://lk.stankin.ru"
+              class="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-white border border-slate-200 text-slate-700 shadow-sm hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 shrink-0"
+              aria-label="Посмотреть оценки">📊</a>
+          </div>
         </div>
 
         <!-- Компонент расписания -->

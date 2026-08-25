@@ -15,6 +15,7 @@ class Program
 
         app.UseCors("AllowFrontend");
         app.MapApi();
+        app.MapBoardApi();
 
         app.Run();
     }
