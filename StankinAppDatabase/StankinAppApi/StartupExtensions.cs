@@ -1,5 +1,6 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Caching.Memory;
 using Serilog;
 using StankinAppApi.Dto;
@@ -14,6 +15,33 @@ static class StartupExtensions
         path.StartsWithSegments("/api/groups") ||
         path.StartsWithSegments("/api/teachers") ||
         path.StartsWithSegments("/api/rooms");
+<<<<<<< Updated upstream
+=======
+
+    static bool ScheduleDbReady(string dbPath)
+    {
+        if (!File.Exists(dbPath)) return false;
+        try
+        {
+            using var conn = new SqliteConnection($"Data Source={dbPath}");
+            conn.Open();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = """
+                SELECT count(*) FROM sqlite_master
+                WHERE type = 'table'
+                  AND name IN ('lessons','sessions','groups','teachers','rooms','schedule_dates')
+                """;
+            return Convert.ToInt64(cmd.ExecuteScalar()) == 6;
+        }
+        catch (SqliteException)
+        {
+            return false;
+        }
+    }
+
+    const int MaxPostLength = 4000;
+
+>>>>>>> Stashed changes
     static string[] AvailableIp =
     [
       "stankinapp.ru"
@@ -100,11 +128,10 @@ static class StartupExtensions
         var debugMode = app.Configuration.GetValue<bool>("Debug:Enabled");
         var dbPath = app.Configuration.GetValue<string>("Database:Path");
         var absoluteDbPath = Path.IsPathRooted(dbPath) ? dbPath : Path.Combine(app.Environment.ContentRootPath, dbPath);
-        var scheduleDbExists = File.Exists(absoluteDbPath);
 
         app.Use(async (ctx, next) =>
         {
-            if (!debugMode && !scheduleDbExists && IsScheduleEndpoint(ctx.Request.Path))
+            if (!debugMode && !ScheduleDbReady(absoluteDbPath) && IsScheduleEndpoint(ctx.Request.Path))
             {
                 ctx.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
                 await ctx.Response.WriteAsJsonAsync(new { error = "Расписание скоро появится" });
