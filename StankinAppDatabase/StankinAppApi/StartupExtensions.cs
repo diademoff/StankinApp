@@ -9,6 +9,11 @@ namespace StankinAppApi;
 
 static class StartupExtensions
 {
+    static bool IsScheduleEndpoint(PathString path) =>
+        path.StartsWithSegments("/api/schedule") ||
+        path.StartsWithSegments("/api/groups") ||
+        path.StartsWithSegments("/api/teachers") ||
+        path.StartsWithSegments("/api/rooms");
     static string[] AvailableIp =
     [
       "stankinapp.ru"
@@ -81,10 +86,33 @@ static class StartupExtensions
             builder.Services.AddSingleton<IDataReader>(_ => new DatabaseReader(absoluteDbPath));
         }
         builder.Services.AddSingleton<ScheduleService>();
+
+        var geoDbPath = configuration.GetValue<string>("GeoIp:DbPath") ?? "data/GeoLite2-Country.mmdb";
+        var absoluteGeoDbPath = Path.IsPathRooted(geoDbPath)
+            ? geoDbPath
+            : Path.Combine(builder.Environment.ContentRootPath, geoDbPath);
+        builder.Services.AddHttpClient();
     }
 
     public static void MapApi(this WebApplication app)
     {
+        // в debug расписание из mock-данных, гейт нужен только для реальной БД
+        var debugMode = app.Configuration.GetValue<bool>("Debug:Enabled");
+        var dbPath = app.Configuration.GetValue<string>("Database:Path");
+        var absoluteDbPath = Path.IsPathRooted(dbPath) ? dbPath : Path.Combine(app.Environment.ContentRootPath, dbPath);
+        var scheduleDbExists = File.Exists(absoluteDbPath);
+
+        app.Use(async (ctx, next) =>
+        {
+            if (!debugMode && !scheduleDbExists && IsScheduleEndpoint(ctx.Request.Path))
+            {
+                ctx.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+                await ctx.Response.WriteAsJsonAsync(new { error = "Расписание скоро появится" });
+                return;
+            }
+            await next();
+        });
+
         app.MapControllers();
 
         app.MapGet("/api/groups", (ScheduleService service, ILogger<Program> log) =>

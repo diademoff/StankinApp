@@ -12,6 +12,7 @@ export function scheduleApp(api: ApiClient) {
     loadingTeachers: false,
     teacherSearch: '',
     showPicker: false,
+    scheduleUnavailable: null as boolean | null,
 
     get filteredTeachers(): string[] {
       const q = this.teacherSearch.trim().toLowerCase();
@@ -33,6 +34,10 @@ export function scheduleApp(api: ApiClient) {
 
     async init() {
       await this.loadGroups();
+      if (this.scheduleUnavailable) {
+        this.startAvailabilityPoll();
+        return;
+      }
 
       const savedMode = localStorage.getItem('viewMode') as 'group' | 'teacher' | null;
       if (savedMode) this.viewMode = savedMode;
@@ -54,12 +59,24 @@ export function scheduleApp(api: ApiClient) {
       try {
         const groups = await api.getGroups();
         this.groups = Array.isArray(groups) ? groups : [];
-      } catch (e) {
+        this.scheduleUnavailable = false;
+      } catch (e: any) {
+        if (e?.status === 503) {
+          this.scheduleUnavailable = true;
+          return;
+        }
         console.error('loadGroups error', e);
         this.error = 'Не удалось загрузить список групп';
       } finally {
         this.loadingGroups = false;
       }
+    },
+
+    startAvailabilityPoll() {
+      setInterval(async () => {
+        if (this.scheduleUnavailable !== true) return;
+        await this.loadGroups();
+      }, 30 * 60 * 1000);
     },
 
     async loadTeachers() {
