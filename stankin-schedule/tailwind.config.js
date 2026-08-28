@@ -7,6 +7,7 @@ module.exports = {
     './about.html',
     './board.html',
     './admin.html',
+    './map.html',
     './src/**/*.{ts,js,tsx,jsx}'
   ],
   theme: {

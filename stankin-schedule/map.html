@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Карта университета</title>
+  <meta name="theme-color" content="#4A90E2">
+  <meta name="theme-color" content="#111827" media="(prefers-color-scheme: dark)">
+  <link rel="apple-touch-icon" href="apple-touch-icon.jpg">
+  <link rel="stylesheet" href="/src/input.css">
+  <script type="module" src="/src/mapMain.ts"></script>
+</head>
+
+<body class="h-dvh overflow-hidden bg-gray-100 text-gray-800" x-data="mapApp" x-init="init()">
+  <!-- Yandex.Metrika counter -->
+  <script type="text/javascript">
+    (function (m, e, t, r, i, k, a) {
+      m[i] = m[i] || function () { (m[i].a = m[i].a || []).push(arguments) };
+      m[i].l = 1 * new Date();
+      for (var j = 0; j < document.scripts.length; j++) { if (document.scripts[j].src === r) { return; } }
+      k = e.createElement(t), a = e.getElementsByTagName(t)[0], k.async = 1, k.src = r, a.parentNode.insertBefore(k, a)
+    })(window, document, 'script', 'https://mc.yandex.ru/metrika/tag.js?id=103946021', 'ym');
+    ym(103946021, 'init', { ssr: true, webvisor: true, clickmap: true, ecommerce: "dataLayer", accurateTrackBounce: true, trackLinks: true });
+  </script>
+  <noscript>
+    <div><img src="https://mc.yandex.ru/watch/103946021" style="position:absolute; left:-9999px;" alt="" /></div>
+  </noscript>
+  <!-- /Yandex.Metrika counter -->
+
+  <div class="h-full max-w-xl mx-auto px-4 py-4 flex flex-col">
+
+    <header class="shrink-0 flex items-center justify-between mb-2">
+      <h1 class="text-xl font-bold">
+        <a href="/" class="text-blue-600 mr-1">←</a>
+        Карта университета
+      </h1>
+      <div class="flex gap-3 text-sm">
+        <a href="/" class="text-gray-500 hover:text-blue-600">Расписание</a>
+        <a href="/board.html" class="text-gray-500 hover:text-blue-600">Доска</a>
+      </div>
+    </header>
+
+    <!-- Текущее положение -->
+    <p class="shrink-0 text-sm text-gray-600 mb-2">📍 <span x-text="locationText"></span></p>
+
+    <!-- Поиск аудитории -->
+    <button @click="openPicker()"
+      class="shrink-0 mb-2 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white text-gray-700 ring-1 ring-gray-200 rounded-xl text-sm font-medium shadow-sm hover:bg-blue-50 hover:text-blue-700 hover:ring-blue-300 transition active:scale-[0.98]">
+      <span>🔍</span>
+      <span>Поиск аудитории</span>
+    </button>
+
+    <!-- Карта -->
+    <div x-ref="canvas"
+      class="flex-1 min-h-0 w-full max-h-[75dvh] rounded-2xl overflow-hidden"></div>
+
+    <p class="shrink-0 text-xs text-gray-500 mt-2 text-center">WASD / стрелки или свайп — движение. Войдите в дверь, чтобы перейти на этаж</p>
+
+    <!-- Модалка: выбор из нескольких локаций (лифт) -->
+    <template x-if="trigger && trigger.to.length > 1">
+      <div class="fixed inset-0 bg-black bg-opacity-40 z-50 flex items-end justify-center p-4"
+        @click.self="trigger = null">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md p-4 space-y-2">
+          <p class="text-sm font-semibold text-gray-900" x-text="trigger.icon + ' ' + trigger.label"></p>
+          <div class="grid gap-2">
+            <template x-for="(dest, i) in trigger.to" :key="i">
+              <button @click="isDestAvailable(dest) && (go(dest), trigger = null)"
+                :disabled="!isDestAvailable(dest)"
+                class="w-full px-4 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                x-text="dest.label + (isDestAvailable(dest) ? '' : ' · скоро')"></button>
+            </template>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Модалка: поиск аудиторий по этажам -->
+    <template x-if="picking">
+      <div class="fixed inset-0 bg-black bg-opacity-40 z-50 flex items-start justify-center p-4 pt-8"
+        @click.self="closePicker()">
+        <div class="bg-white rounded-2xl shadow-xl w-full max-w-md flex flex-col max-h-[80vh]">
+
+          <div class="flex items-center justify-between px-4 pt-4 pb-3 border-b border-gray-100 shrink-0">
+            <h2 class="text-lg font-semibold">Поиск аудиторий</h2>
+            <button x-show="game" @click="closePicker()"
+              class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500 transition">✕</button>
+          </div>
+
+          <div class="relative px-4 py-3 shrink-0">
+            <span class="absolute left-7 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">🔍</span>
+            <input
+              type="text"
+              x-model="search"
+              placeholder="Поиск аудитории..."
+              class="w-full pl-9 pr-4 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition"
+            />
+          </div>
+
+          <div class="overflow-y-auto flex-1 px-4 pb-4 space-y-3">
+            <template x-if="Object.keys(floorData).length === 0">
+              <p class="text-center text-gray-500 py-4 text-sm">Загрузка...</p>
+            </template>
+            <template x-if="Object.keys(floorData).length > 0 && groupedRooms.length === 0">
+              <p class="text-center text-gray-500 py-4 text-sm">Ничего не найдено</p>
+            </template>
+            <template x-for="group in groupedRooms" :key="group.floorId">
+              <div>
+                <p class="text-xs text-gray-500 mb-1.5 font-medium uppercase tracking-wide" x-text="group.floorLabel"></p>
+                <div class="grid grid-cols-2 gap-2">
+                  <template x-for="name in group.rooms" :key="name">
+                    <button @click="pickRoom(group.floorId, name)"
+                      class="bg-gray-50 hover:bg-blue-50 hover:text-blue-700 border border-gray-200 rounded-xl p-3 text-sm font-medium transition active:scale-95"
+                      x-text="name"></button>
+                  </template>
+                </div>
+              </div>
+            </template>
+          </div>
+
+          <div class="p-4 shrink-0 border-t border-gray-100">
+            <button @click="randomSpawn()"
+              class="block w-full text-center bg-gray-100 text-gray-700 font-medium py-3 px-4 rounded-xl hover:bg-gray-200 transition-all duration-150 active:scale-95">
+              Случайный вход
+            </button>
+          </div>
+        </div>
+      </div>
+    </template>
+  </div>
+</body>
+
+</html>

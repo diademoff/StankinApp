@@ -33,7 +33,8 @@ export default defineConfig({
         main: resolve(__dirname, 'index.html'),
         about: resolve(__dirname, 'about.html'),
         board: resolve(__dirname, 'board.html'),
-        admin: resolve(__dirname, 'admin.html')
+        admin: resolve(__dirname, 'admin.html'),
+        map: resolve(__dirname, 'map.html')
       }
     }
   }
