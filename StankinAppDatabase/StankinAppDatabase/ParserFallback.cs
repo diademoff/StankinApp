@@ -10,7 +10,13 @@ namespace StankinAppDatabase
         private readonly string _filePath;
         private ScheduleJsonReader? _reader;
         private const string TemporarySubject = "TEMPORARY_SUBJECT";
-        private const string TemporaryTeacher = "Иванов А.Б.";
+
+        // Пул валидных по формату «Фамилия И.О.» имён, по одному на каждого
+        // заменяемого преподавателя строки, чтобы сопоставить токен обратно.
+        private static readonly string[] TemporaryTeachers =
+        {
+            "Иванов А.А.", "Петров Б.Б.", "Сидоров В.В.", "Кузнецов Г.Г."
+        };
 
         // Сколько раз подряд пользователь может нажать Enter без ввода,
         // прежде чем строка будет пропущена автоматически
@@ -67,14 +73,30 @@ namespace StankinAppDatabase
         {
             courses = Array.Empty<Course>();
 
-            var subject = SubjectNamesWithDots.FirstOrDefault(err.LineToParse.Contains);
-            var teacher = AnomalyTeachers.FirstOrDefault(x => err.LineToParse.Contains(x.IncorrectName));
-            if (subject == null && teacher == null)
-                return false;
-
             var line = err.LineToParse;
-            if (subject != null) line = line.Replace(subject, TemporarySubject);
-            if (teacher != null) line = line.Replace(teacher.IncorrectName, TemporaryTeacher);
+
+            // Предметы с точкой: заменяем без хвостовой точки, чтобы точка-разделитель
+            // осталась на месте и плейсхолдер не слился с именем преподавателя.
+            var subjectMap = new Dictionary<string, string>();
+            foreach (var s in SubjectNamesWithDots.Where(s => line.Contains(s)))
+            {
+                line = line.Replace(s.TrimEnd('.'), TemporarySubject);
+                subjectMap[TemporarySubject] = s.TrimEnd('.');
+            }
+
+            // Аномальные преподаватели: заменяем всех (не только первого),
+            // каждому — свой токен для корректной обратной подстановки.
+            var teacherMap = new Dictionary<string, string>();
+            int tokenIndex = 0;
+            foreach (var t in AnomalyTeachers.Where(t => line.Contains(t.IncorrectName)))
+            {
+                var token = TemporaryTeachers[tokenIndex++ % TemporaryTeachers.Length];
+                line = line.Replace(t.IncorrectName, token);
+                teacherMap[token] = t.CorrectName;
+            }
+
+            if (line == err.LineToParse)
+                return false;
 
             try
             {
@@ -86,8 +108,8 @@ namespace StankinAppDatabase
                     throwOnFail: true)
                     .Select(x => x with
                     {
-                        Subject = x.Subject == TemporarySubject && subject != null ? subject : x.Subject,
-                        Teacher = x.Teacher == TemporaryTeacher && teacher != null ? teacher.CorrectName : x.Teacher
+                        Subject = subjectMap.GetValueOrDefault(x.Subject, x.Subject),
+                        Teacher = teacherMap.GetValueOrDefault(x.Teacher, x.Teacher)
                     })
                     .ToArray();
                 return true;

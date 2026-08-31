@@ -339,5 +339,81 @@ namespace StankinAppDatabase.Tests
                 Assert.That(output[0].Cabinet, Is.EqualTo("0801"));
             });
         }
+
+        [Test]
+        public void ParseFallback_DottedSubjectWithVacancyTeacher_ReplacesWithNeUkazan()
+        {
+            var path = WriteTempFallback(
+                """{"SubjectNamesWithDots":["Тестирование ПО."],"AnomalyTeachers":[{"IncorrectName":"Вакансия Т.2","CorrectName":"Не указан"},{"IncorrectName":"Вакансия Т.2.","CorrectName":"Не указан"}]}""");
+
+            try
+            {
+                var fallback = new ParserFallback(2026, path);
+                var err = new ErrorParsingInfo
+                {
+                    LineToParse = "Тестирование ПО. Вакансия Т.2. Лабораторная. (А). . [10.10-07.11 к.н.]",
+                    GroupName = "ИДБ-25-02",
+                    StartTime = new NodaTime.LocalTime(10, 0),
+                    Duration = NodaTime.Period.FromMinutes(90),
+                    FailedToParseCourses = new()
+                };
+
+                var courses = fallback.ParseFallbackFunc(err);
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(courses, Has.Length.EqualTo(1));
+                    Assert.That(courses[0].Subject, Is.EqualTo("Тестирование ПО"));
+                    Assert.That(courses[0].Teacher, Is.EqualTo("Не указан"));
+                    Assert.That(courses[0].Type, Is.EqualTo("Лабораторная"));
+                });
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        [Test]
+        public void ParseFallback_MultipleVacancyTeachers_ReplacesAll()
+        {
+            var path = WriteTempFallback(
+                """{"SubjectNamesWithDots":["Тестирование ПО."],"AnomalyTeachers":[{"IncorrectName":"Вакансия Т.1.","CorrectName":"Не указан"},{"IncorrectName":"Вакансия Т.5.","CorrectName":"Не указан"}]}""");
+
+            try
+            {
+                var fallback = new ParserFallback(2026, path);
+                var err = new ErrorParsingInfo
+                {
+                    LineToParse = "Тестирование ПО. Вакансия Т.1. Лекция. . [05.09-03.10 к.н.] Гибкие методологии. Вакансия Т.5. Лекция. . [14.11-12.12 к.н.]",
+                    GroupName = "ИДБ-25-01",
+                    StartTime = new NodaTime.LocalTime(9, 0),
+                    Duration = NodaTime.Period.FromMinutes(90),
+                    FailedToParseCourses = new()
+                };
+
+                var courses = fallback.ParseFallbackFunc(err);
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(courses, Has.Length.EqualTo(2));
+                    Assert.That(courses[0].Subject, Is.EqualTo("Тестирование ПО"));
+                    Assert.That(courses[0].Teacher, Is.EqualTo("Не указан"));
+                    Assert.That(courses[1].Subject, Is.EqualTo("Гибкие методологии"));
+                    Assert.That(courses[1].Teacher, Is.EqualTo("Не указан"));
+                });
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+
+        private static string WriteTempFallback(string json)
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"fallback_test_{Guid.NewGuid():N}.json");
+            File.WriteAllText(path, json);
+            return path;
+        }
     }
 }
