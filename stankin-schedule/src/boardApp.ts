@@ -21,6 +21,9 @@ export function boardApp(api: ApiClient) {
     postText: '',
     sage: false,
     replyParentId: null as number | null,
+    composerOpen: false,
+    captchaOpen: false,
+    captchaInitDone: false,
     captchaWidgetId: null as number | null,
     depths: {} as Record<number, number>,
 
@@ -40,8 +43,8 @@ export function boardApp(api: ApiClient) {
     },
 
     init() {
+      try { localStorage.setItem('boardLastVisitAt', new Date().toISOString()); } catch {}
       this.loadThreads(true);
-      this.initCaptcha();
     },
 
     async loadThreads(reset = false) {
@@ -77,6 +80,7 @@ export function boardApp(api: ApiClient) {
         this.replyParentId = null;
         this.postText = '';
         this.sage = false;
+        this.composerOpen = false;
         this.depths = {};
       } catch (e) {
         this.error = (e as Error).message;
@@ -90,6 +94,7 @@ export function boardApp(api: ApiClient) {
       this.thread = null;
       this.replyParentId = null;
       this.postText = '';
+      this.composerOpen = false;
       this.loadThreads(true);
     },
 
@@ -111,7 +116,12 @@ export function boardApp(api: ApiClient) {
       }
     },
 
-    initCaptcha() {
+    showCaptcha() {
+      this.captchaOpen = true;
+      if (this.captchaInitDone) {
+        this.resetCaptcha();
+        return;
+      }
       const render = () => {
         const sc = (window as any).smartCaptcha;
         const el = this.$refs.captcha as HTMLElement | undefined;
@@ -119,9 +129,18 @@ export function boardApp(api: ApiClient) {
           setTimeout(render, 200);
           return;
         }
-        this.captchaWidgetId = sc.render(el, { sitekey: SITE_KEY });
+        this.captchaWidgetId = sc.render(el, {
+          sitekey: SITE_KEY,
+          callback: () => this.submit(),
+        });
+        this.captchaInitDone = true;
       };
       render();
+    },
+
+    closeCaptcha() {
+      this.captchaOpen = false;
+      this.resetCaptcha();
     },
 
     getCaptchaToken(): string {
@@ -134,25 +153,37 @@ export function boardApp(api: ApiClient) {
       if (sc?.reset && this.captchaWidgetId != null) sc.reset(this.captchaWidgetId);
     },
 
+    scrollToPost(postId: number) {
+      this.$nextTick(() => {
+        document.getElementById(`post-${postId}`)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+    },
+
     async submit() {
       const text = this.postText.trim();
       if (!text) return;
       const token = this.getCaptchaToken();
       if (!token) {
         this.error = 'Пройдите капчу';
+        this.showCaptcha();
         return;
       }
       this.loading = true;
       this.error = '';
       try {
         if (this.view === 'thread') {
-          await api.createReply(this.thread.id, text, token, this.replyParentId, this.sage);
+          const post = await api.createReply(this.thread.id, text, token, this.replyParentId, this.sage);
+          await this.openThread(this.thread.id);
+          this.scrollToPost(post.id);
         } else {
           const post = await api.createThread(text, token);
           await this.openThread(post.id);
+          this.scrollToPost(post.id);
         }
         this.postText = '';
         this.sage = false;
+        this.composerOpen = false;
+        this.captchaOpen = false;
       } catch (e) {
         this.error = (e as Error).message;
       } finally {

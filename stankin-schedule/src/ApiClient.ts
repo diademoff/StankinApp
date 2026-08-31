@@ -71,6 +71,12 @@ export class ApiClient {
     return await this.fetchJson(`${this.base}/api/board/threads/${threadId}`);
   }
 
+  async getNewThreadsCount(since: string | null): Promise<number> {
+    const qs = since ? `?since=${encodeURIComponent(since)}` : '';
+    const response = await this.fetchJson(`${this.base}/api/board/stats${qs}`);
+    return response?.newThreads ?? 0;
+  }
+
   async createThread(text: string, captchaToken: string): Promise<any> {
     return await this.fetchJson(`${this.base}/api/board/threads`, {
       method: 'POST',

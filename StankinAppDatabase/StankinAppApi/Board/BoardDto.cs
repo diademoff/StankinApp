@@ -2,7 +2,7 @@ namespace StankinAppApi.Board;
 
 public record PostDto(long Id, long? ThreadId, long? ParentId, string Text, DateTime CreatedAt, DateTime UpdatedAt, bool IsDeleted, int ReportCount);
 
-public record ThreadSummaryDto(long Id, PostDto Op, int ReplyCount, DateTime UpdatedAt, List<PostDto> LastPosts);
+public record ThreadSummaryDto(long Id, PostDto Op, int ReplyCount, DateTime UpdatedAt, List<PostDto> LastPosts, bool IsPinned);
 
 public record ThreadDetailDto(long Id, List<PostDto> Posts);
 

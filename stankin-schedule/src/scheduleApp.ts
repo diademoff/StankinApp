@@ -13,6 +13,7 @@ export function scheduleApp(api: ApiClient) {
     teacherSearch: '',
     showPicker: false,
     scheduleUnavailable: null as boolean | null,
+    boardNewThreads: 0,
 
     get filteredTeachers(): string[] {
       const q = this.teacherSearch.trim().toLowerCase();
@@ -34,6 +35,7 @@ export function scheduleApp(api: ApiClient) {
 
     async init() {
       await this.loadGroups();
+      await this.loadBoardBadge();
       if (this.scheduleUnavailable) {
         this.startAvailabilityPoll();
         return;
@@ -77,6 +79,16 @@ export function scheduleApp(api: ApiClient) {
         if (this.scheduleUnavailable !== true) return;
         await this.loadGroups();
       }, 30 * 60 * 1000);
+    },
+
+    async loadBoardBadge() {
+      try {
+        const lastVisit = localStorage.getItem('boardLastVisitAt');
+        this.boardNewThreads = await api.getNewThreadsCount(lastVisit);
+      } catch (e) {
+        console.error('loadBoardBadge error', e);
+        this.boardNewThreads = 0;
+      }
     },
 
     async loadTeachers() {

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Data.Sqlite;
@@ -117,7 +118,8 @@ static class StartupExtensions
         var absoluteBoardDbPath = Path.IsPathRooted(boardDbPath)
             ? boardDbPath
             : Path.Combine(builder.Environment.ContentRootPath, boardDbPath);
-        var boardRepo = new BoardRepository(absoluteBoardDbPath);
+        var pinnedThreadIds = configuration.GetSection("Board:PinnedThreads").Get<List<long>>() ?? new List<long>();
+        var boardRepo = new BoardRepository(absoluteBoardDbPath, pinnedThreadIds);
         boardRepo.EnsureSchema();
         builder.Services.AddSingleton(boardRepo);
 
@@ -364,7 +366,16 @@ static class StartupExtensions
             var threads = repo.GetThreads(p, pageSize);
             return Results.Ok(new ListResponse<ThreadSummaryDto>(threads.Select(t =>
                 new ThreadSummaryDto(t.Op.Id, BoardMapper.ToDto(t.Op), t.ReplyCount, t.Op.UpdatedAt,
-                    t.LastReplies.Select(BoardMapper.ToDto).ToList()))));
+                    t.LastReplies.Select(BoardMapper.ToDto).ToList(), t.IsPinned))));
+        });
+
+        app.MapGet("/api/board/stats", (string since, BoardRepository repo) =>
+        {
+            DateTime? sinceDate = null;
+            if (!string.IsNullOrWhiteSpace(since)
+                && DateTime.TryParse(since, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed))
+                sinceDate = parsed;
+            return Results.Ok(new { newThreads = repo.CountNewThreads(sinceDate) });
         });
 
         app.MapGet("/api/board/threads/{threadId:long}", (long threadId, BoardRepository repo) =>

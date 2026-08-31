@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.Json;
 using Microsoft.Data.Sqlite;
 
 namespace StankinAppApi.Board;
@@ -8,6 +9,7 @@ public class ThreadSummary
     public Post Op { get; set; } = new();
     public int ReplyCount { get; set; }
     public List<Post> LastReplies { get; set; } = new();
+    public bool IsPinned { get; set; }
 }
 
 public class BoardRepository
@@ -16,8 +18,13 @@ public class BoardRepository
         "id, thread_id, parent_id, text, created_at, updated_at, is_deleted, report_count, ip_hash";
 
     private readonly string _dbPath;
+    private readonly HashSet<long> _pinned;
 
-    public BoardRepository(string dbPath) => _dbPath = dbPath;
+    public BoardRepository(string dbPath, IReadOnlyCollection<long> pinnedThreadIds = null)
+    {
+        _dbPath = dbPath;
+        _pinned = pinnedThreadIds == null ? new HashSet<long>() : new HashSet<long>(pinnedThreadIds);
+    }
 
     private SqliteConnection Open()
     {
@@ -103,10 +110,11 @@ public class BoardRepository
                         (SELECT COUNT(*) FROM posts r WHERE r.thread_id = p.id) AS reply_count
                     FROM posts p
                     WHERE p.thread_id IS NULL AND p.is_deleted = 0
-                    ORDER BY p.updated_at DESC
+                    ORDER BY CASE WHEN p.id IN (SELECT value FROM json_each(@pinned)) THEN 0 ELSE 1 END, p.updated_at DESC
                     LIMIT @limit OFFSET @offset";
             cmd.Parameters.AddWithValue("@limit", pageSize);
             cmd.Parameters.AddWithValue("@offset", (page - 1) * pageSize);
+            cmd.Parameters.AddWithValue("@pinned", JsonSerializer.Serialize(_pinned));
             using var r = cmd.ExecuteReader();
             while (r.Read())
             {
@@ -118,6 +126,7 @@ public class BoardRepository
         {
             Op = o.Op,
             ReplyCount = o.ReplyCount,
+            IsPinned = _pinned.Contains(o.Op.Id),
             LastReplies = GetLastReplies(conn, o.Op.Id)
         }).ToList();
     }
@@ -223,6 +232,18 @@ public class BoardRepository
         cmd.CommandText = "UPDATE posts SET report_count = report_count + 1 WHERE id = @id";
         cmd.Parameters.AddWithValue("@id", postId);
         return cmd.ExecuteNonQuery() > 0;
+    }
+
+    public int CountNewThreads(DateTime? since)
+    {
+        using var conn = Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = since == null
+            ? "SELECT COUNT(*) FROM posts WHERE thread_id IS NULL AND is_deleted = 0"
+            : "SELECT COUNT(*) FROM posts WHERE thread_id IS NULL AND is_deleted = 0 AND created_at > @since";
+        if (since != null)
+            cmd.Parameters.AddWithValue("@since", since.Value.ToString("O", CultureInfo.InvariantCulture));
+        return Convert.ToInt32(cmd.ExecuteScalar());
     }
 
     public List<Post> GetReports()
