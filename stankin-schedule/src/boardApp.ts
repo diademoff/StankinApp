@@ -118,24 +118,25 @@ export function boardApp(api: ApiClient) {
 
     showCaptcha() {
       this.captchaOpen = true;
-      if (this.captchaInitDone) {
-        this.resetCaptcha();
+      this.renderCaptcha();
+    },
+
+    renderCaptcha() {
+      const sc = (window as any).smartCaptcha;
+      const el = this.$refs.captcha as HTMLElement | undefined;
+      // контейнер скрыт (display:none) => offsetWidth === 0; ждём пока модалка видима
+      if (!sc?.render || !el || el.offsetWidth === 0) {
+        setTimeout(() => this.renderCaptcha(), 200);
         return;
       }
-      const render = () => {
-        const sc = (window as any).smartCaptcha;
-        const el = this.$refs.captcha as HTMLElement | undefined;
-        if (!sc?.render || !el) {
-          setTimeout(render, 200);
-          return;
-        }
-        this.captchaWidgetId = sc.render(el, {
-          sitekey: SITE_KEY,
-          callback: () => this.submit(),
-        });
+      try {
+        if (this.captchaWidgetId == null) el.innerHTML = ''; // чистим от битого виджета при ретрае
+        this.captchaWidgetId = sc.render(el, { sitekey: SITE_KEY, callback: () => this.submit() });
         this.captchaInitDone = true;
-      };
-      render();
+      } catch {
+        this.captchaWidgetId = null;
+        setTimeout(() => this.renderCaptcha(), 200);
+      }
     },
 
     closeCaptcha() {
@@ -145,7 +146,11 @@ export function boardApp(api: ApiClient) {
 
     getCaptchaToken(): string {
       const sc = (window as any).smartCaptcha;
-      return sc?.getResponse?.(this.captchaWidgetId) ?? '';
+      try {
+        return sc?.getResponse?.(this.captchaWidgetId) ?? '';
+      } catch {
+        return '';
+      }
     },
 
     resetCaptcha() {
