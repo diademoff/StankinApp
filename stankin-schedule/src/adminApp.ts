@@ -3,12 +3,17 @@ import { ApiClient } from './ApiClient';
 export function adminApp(api: ApiClient) {
   return {
     secret: (sessionStorage.getItem('adminSecret') || '') as string,
+    authed: false,
     reports: [] as any[],
     loading: false,
     error: '' as string,
 
     get isAuthed(): boolean {
-      return !!this.secret;
+      return this.authed;
+    },
+
+    init() {
+      if (this.secret) this.login();
     },
 
     async login() {
@@ -17,15 +22,23 @@ export function adminApp(api: ApiClient) {
         this.error = 'Введите пароль';
         return;
       }
+      this.loading = true;
       try {
+        this.reports = await api.adminGetReports(this.secret);
+        this.authed = true;
         sessionStorage.setItem('adminSecret', this.secret);
-        await this.load();
       } catch (e) {
+        this.authed = false;
+        sessionStorage.removeItem('adminSecret');
         this.error = (e as Error).message;
+        this.reports = [];
+      } finally {
+        this.loading = false;
       }
     },
 
     async load() {
+      if (!this.authed) return;
       this.loading = true;
       this.error = '';
       try {
@@ -33,6 +46,10 @@ export function adminApp(api: ApiClient) {
       } catch (e) {
         this.error = (e as Error).message;
         this.reports = [];
+        if ((e as any).status === 401) {
+          this.authed = false;
+          sessionStorage.removeItem('adminSecret');
+        }
       } finally {
         this.loading = false;
       }
@@ -70,6 +87,7 @@ export function adminApp(api: ApiClient) {
     logout() {
       sessionStorage.removeItem('adminSecret');
       this.secret = '';
+      this.authed = false;
       this.reports = [];
     },
   };
