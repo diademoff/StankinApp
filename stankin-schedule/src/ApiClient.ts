@@ -5,7 +5,10 @@ export class ApiClient {
     try {
       const res = await fetch(url, {
         ...options,
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(options.headers as Record<string, string> | undefined),
+        },
       });
 
       if (res.status === 204) {
