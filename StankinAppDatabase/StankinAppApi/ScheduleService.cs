@@ -1,4 +1,5 @@
 using System.Globalization;
+using Microsoft.Extensions.Caching.Memory;
 using StankinAppCore;
 using StankinAppApi.Dto;
 using NodaTime;
@@ -8,13 +9,28 @@ namespace StankinAppApi;
 public class ScheduleService
 {
     private readonly IDataReader _db;
+    private readonly IMemoryCache _cache;
     private const double MaxGapMinutes = 30;
+    // списки групп/преподавателей/аудиторий меняются только при пересборке БД,
+    // 1 ч стальности безопасен и снимает чтение таблицы с каждого визита главной
+    private static readonly TimeSpan ListCacheTtl = TimeSpan.FromMinutes(60);
 
-    public ScheduleService(IDataReader db) => _db = db;
+    public ScheduleService(IDataReader db, IMemoryCache cache)
+    {
+        _db = db;
+        _cache = cache;
+    }
 
-    public IEnumerable<string> GetGroups()   => _db.GetGroups();
-    public IEnumerable<string> GetRooms()    => _db.GetRooms();
-    public IEnumerable<string> GetTeachers() => _db.GetTeachers();
+    public IEnumerable<string> GetGroups() => CachedList("sched:groups", _db.GetGroups);
+    public IEnumerable<string> GetRooms() => CachedList("sched:rooms", _db.GetRooms);
+    public IEnumerable<string> GetTeachers() => CachedList("sched:teachers", _db.GetTeachers);
+
+    private IEnumerable<string> CachedList(string key, Func<IEnumerable<string>> load) =>
+        _cache.GetOrCreate(key, e =>
+        {
+            e.AbsoluteExpirationRelativeToNow = ListCacheTtl;
+            return load().ToList();
+        })!;
 
     public IEnumerable<CourseDto> GetMergedScheduleForGroup(
         string groupName, string startDate, string endDate)

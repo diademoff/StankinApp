@@ -95,16 +95,37 @@ public class BoardRepository
         return r.Read() ? ReadPost(r) : null;
     }
 
-    private static List<Post> GetLastReplies(SqliteConnection conn, long threadId)
+    private static List<Post> ReadAll(SqliteConnection conn, string sql, params SqliteParameter[] parameters)
     {
         var posts = new List<Post>();
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = $"SELECT {PostColumns} FROM posts WHERE thread_id = @tid AND is_deleted = 0 ORDER BY id DESC LIMIT 3";
-        cmd.Parameters.AddWithValue("@tid", threadId);
+        cmd.CommandText = sql;
+        cmd.Parameters.AddRange(parameters);
         using var r = cmd.ExecuteReader();
         while (r.Read()) posts.Add(ReadPost(r));
-        posts.Reverse();
         return posts;
+    }
+
+    // последние 3 ответа для всех тредов страницы одним запросом вместо N+1
+    private static Dictionary<long, List<Post>> LoadLastReplies(SqliteConnection conn, IReadOnlyList<long> threadIds)
+    {
+        var map = new Dictionary<long, List<Post>>();
+        if (threadIds.Count == 0) return map;
+        using var cmd = conn.CreateCommand();
+        // id берутся из БД (не от клиента) — безопасны для IN-списка
+        cmd.CommandText = $@"SELECT {PostColumns} FROM posts
+                             WHERE thread_id IN ({string.Join(",", threadIds)}) AND is_deleted = 0
+                             ORDER BY id DESC";
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+        {
+            var p = ReadPost(r);
+            var tid = p.ThreadId!.Value;
+            if (!map.TryGetValue(tid, out var list))
+                map[tid] = list = new List<Post>();
+            if (list.Count < 3) list.Add(p); // DESC → первые 3 и есть последние ответы
+        }
+        return map;
     }
 
     public List<ThreadSummary> GetThreads(int page, int pageSize)
@@ -129,25 +150,28 @@ public class BoardRepository
                 ops.Add((op, r.GetInt32(9)));
             }
         }
-        return ops.Select(o => new ThreadSummary
+        var lastReplies = LoadLastReplies(conn, ops.Select(o => o.Op.Id).ToList());
+        return ops.Select(o =>
         {
-            Op = o.Op,
-            ReplyCount = o.ReplyCount,
-            IsPinned = _pinned.Contains(o.Op.Id),
-            LastReplies = GetLastReplies(conn, o.Op.Id)
+            lastReplies.TryGetValue(o.Op.Id, out var replies);
+            var last = replies ?? new List<Post>();
+            last.Reverse(); // DESC-выборка → хронологический порядок
+            return new ThreadSummary
+            {
+                Op = o.Op,
+                ReplyCount = o.ReplyCount,
+                IsPinned = _pinned.Contains(o.Op.Id),
+                LastReplies = last
+            };
         }).ToList();
     }
 
     public List<Post> GetThread(long threadId)
     {
-        var posts = new List<Post>();
         using var conn = Open();
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = $"SELECT {PostColumns} FROM posts WHERE id = @tid OR thread_id = @tid ORDER BY id";
-        cmd.Parameters.AddWithValue("@tid", threadId);
-        using var r = cmd.ExecuteReader();
-        while (r.Read()) posts.Add(ReadPost(r));
-        return posts;
+        return ReadAll(conn,
+            $"SELECT {PostColumns} FROM posts WHERE id = @tid OR thread_id = @tid ORDER BY id",
+            new SqliteParameter("@tid", threadId));
     }
 
     public Post CreateThread(string text, string ipHash)
@@ -257,13 +281,9 @@ public class BoardRepository
 
     public List<Post> GetReports()
     {
-        var posts = new List<Post>();
         using var conn = Open();
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = $"SELECT {PostColumns} FROM posts WHERE report_count > 0 AND is_deleted = 0 ORDER BY report_count DESC, id";
-        using var r = cmd.ExecuteReader();
-        while (r.Read()) posts.Add(ReadPost(r));
-        return posts;
+        return ReadAll(conn,
+            $"SELECT {PostColumns} FROM posts WHERE report_count > 0 AND is_deleted = 0 ORDER BY report_count DESC, id");
     }
 
     public bool SoftDelete(long postId)

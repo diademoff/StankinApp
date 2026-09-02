@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Caching.Memory;
 using Serilog;
+using Serilog.Events;
 using StankinAppApi.Board;
 using StankinAppApi.Dto;
 using StankinAppCore;
@@ -51,6 +52,8 @@ static class StartupExtensions
         Log.Logger = new LoggerConfiguration()
             .Enrich.FromLogContext()
             .MinimumLevel.Error()
+            // лог нагрузки (10-сек окно) пишется на Information в своём namespace
+            .MinimumLevel.Override("StankinAppApi.Diagnostics", LogEventLevel.Information)
             .WriteTo.Console()
             .CreateLogger();
 
