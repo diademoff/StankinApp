@@ -18,6 +18,7 @@ export function boardApp(api: ApiClient) {
     hasMore: true,
     loading: false,
     error: '' as string,
+    listDirty: false,
     postText: '',
     sage: false,
     replyParentId: null as number | null,
@@ -90,12 +91,18 @@ export function boardApp(api: ApiClient) {
     },
 
     backToList() {
+      const stale = this.listDirty || this.threads.length === 0;
       this.view = 'list';
       this.thread = null;
       this.replyParentId = null;
       this.postText = '';
       this.composerOpen = false;
-      this.loadThreads(true);
+      // refetch только если юзер только что что-то написал (список в памяти устарел);
+      // при простом возврате из треда показываем уже загруженные данные без запроса
+      if (stale) {
+        this.listDirty = false;
+        this.loadThreads(true);
+      }
     },
 
     formatText(text: string): string {
@@ -189,6 +196,7 @@ export function boardApp(api: ApiClient) {
         this.sage = false;
         this.composerOpen = false;
         this.captchaOpen = false;
+        this.listDirty = true;
       } catch (e) {
         this.error = (e as Error).message;
       } finally {

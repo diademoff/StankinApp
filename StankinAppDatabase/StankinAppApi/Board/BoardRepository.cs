@@ -19,6 +19,13 @@ public class BoardRepository
 
     private readonly string _dbPath;
     private readonly HashSet<long> _pinned;
+    private long _rev;
+
+    // ponytail: общий rev вместо точечной инвалидации кэша — записи редкие,
+    // ключи с rev сами вымываются TTL кэша чтений
+    public long Revision => Volatile.Read(ref _rev);
+
+    private void BumpRev() => Interlocked.Increment(ref _rev);
 
     public BoardRepository(string dbPath, IReadOnlyCollection<long> pinnedThreadIds = null)
     {
@@ -155,6 +162,7 @@ public class BoardRepository
         cmd.Parameters.AddWithValue("@now", now);
         cmd.Parameters.AddWithValue("@ip", ipHash);
         var id = (long)cmd.ExecuteScalar();
+        BumpRev();
         return GetPost(conn, id);
     }
 
@@ -222,6 +230,7 @@ public class BoardRepository
         }
 
         tx.Commit();
+        BumpRev();
         return (GetPost(conn, id), bumped);
     }
 
@@ -285,6 +294,7 @@ public class BoardRepository
         }
 
         tx.Commit();
+        BumpRev();
         return true;
     }
 

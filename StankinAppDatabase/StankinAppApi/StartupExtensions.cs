@@ -343,7 +343,11 @@ static class StartupExtensions
     {
         var bumpLimit = app.Configuration.GetValue<int>("Board:BumpLimit", 50);
         var pageSize = app.Configuration.GetValue<int>("Board:PageSize", 20);
+        var cacheSeconds = app.Configuration.GetValue<int>("Board:CacheSeconds", 10);
+        var cache = app.Services.GetRequiredService<IMemoryCache>();
 
+        // чтения кэшируются на cacheSeconds; ключ содержит Revision репозитория,
+        // поэтому после записи список/тред отдаются сразу актуальными
         app.Use(async (ctx, next) =>
         {
             if (ctx.Request.Path.StartsWithSegments("/api/admin"))
@@ -363,10 +367,15 @@ static class StartupExtensions
         app.MapGet("/api/board/threads", (int? page, BoardRepository repo) =>
         {
             var p = Math.Max(1, page ?? 1);
-            var threads = repo.GetThreads(p, pageSize);
-            return Results.Ok(new ListResponse<ThreadSummaryDto>(threads.Select(t =>
-                new ThreadSummaryDto(t.Op.Id, BoardMapper.ToDto(t.Op), t.ReplyCount, t.Op.UpdatedAt,
-                    t.LastReplies.Select(BoardMapper.ToDto).ToList(), t.IsPinned))));
+            var key = $"board:list:{repo.Revision}:{p}";
+            var items = cache.GetOrCreate(key, entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(cacheSeconds);
+                return repo.GetThreads(p, pageSize).Select(t =>
+                    new ThreadSummaryDto(t.Op.Id, BoardMapper.ToDto(t.Op), t.ReplyCount, t.Op.UpdatedAt,
+                        t.LastReplies.Select(BoardMapper.ToDto).ToList(), t.IsPinned)).ToList();
+            })!;
+            return Results.Ok(new ListResponse<ThreadSummaryDto>(items));
         });
 
         app.MapGet("/api/board/stats", (string since, BoardRepository repo) =>
@@ -380,10 +389,18 @@ static class StartupExtensions
 
         app.MapGet("/api/board/threads/{threadId:long}", (long threadId, BoardRepository repo) =>
         {
-            var posts = repo.GetThread(threadId);
-            if (posts.Count == 0)
+            var key = $"board:thread:{repo.Revision}:{threadId}";
+            var dto = cache.GetOrCreate(key, entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(cacheSeconds);
+                var posts = repo.GetThread(threadId);
+                return posts.Count == 0
+                    ? null
+                    : new ThreadDetailDto(threadId, posts.Select(BoardMapper.ToDto).ToList());
+            });
+            if (dto == null)
                 return Results.NotFound();
-            return Results.Ok(new ThreadDetailDto(threadId, posts.Select(BoardMapper.ToDto).ToList()));
+            return Results.Ok(dto);
         });
 
         app.MapPost("/api/board/threads",
