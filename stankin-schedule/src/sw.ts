@@ -53,6 +53,8 @@ registerRoute(
 //   3) при реальном изменении тела — обновляем кэш и шлём SCHEDULE_UPDATED,
 //      страница перерисовывает открытую неделю без рефетча.
 const SCHEDULE_CACHE = 'schedule-cache-v1';
+// старый кэш (NetworkFirst), куда ложили ответы до введения schedule-cache
+const LEGACY_API_CACHE = 'api-cache';
 const scheduleExpiration = new CacheExpiration(SCHEDULE_CACHE, {
   maxEntries: 600,
   maxAgeSeconds: 30 * 24 * 60 * 60,
@@ -68,11 +70,29 @@ function isScheduleRead(pathname: string): boolean {
   return pathname === '/api/teachers';
 }
 
+// ищем в schedule-cache, при промахе — в legacy api-cache (данные от старого SW),
+// находку «поднимаем» в schedule-cache, чтобы дальше всё шло через один кэш
+async function scheduleCacheMatch(request: Request): Promise<Response | undefined> {
+  const cache = await caches.open(SCHEDULE_CACHE);
+  const cached = await cache.match(request);
+  if (cached) return cached;
+
+  const legacy = await caches.open(LEGACY_API_CACHE);
+  const old = await legacy.match(request);
+  if (old) {
+    await cache.put(request, old.clone());
+    await scheduleExpiration.updateTimestamp(request.url);
+    await scheduleExpiration.expireEntries();
+    return old;
+  }
+  return undefined;
+}
+
 registerRoute(
   ({ url, request }) => request.method === 'GET' && isScheduleRead(url.pathname),
   async ({ request, url }) => {
     const cache = await caches.open(SCHEDULE_CACHE);
-    const cached = await cache.match(request);
+    const cached = await scheduleCacheMatch(request);
     if (cached) {
       // показываем из кэша мгновенно, актуализацию гоняем в фоне
       void revalidate(request, url, cache);
@@ -126,7 +146,7 @@ async function revalidate(request: Request, url: URL, cache: Cache): Promise<voi
 registerRoute(
   ({ url }) => url.pathname.startsWith('/api/'),
   new NetworkFirst({
-    cacheName: 'api-cache',
+    cacheName: LEGACY_API_CACHE,
     plugins: [
       new CacheableResponsePlugin({ statuses: [0, 200] }),
       new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 60 * 60 * 8 }) // 8 часов

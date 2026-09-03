@@ -2,6 +2,7 @@ import { ApiClient } from './ApiClient';
 import { DateUtils } from './date-utils';
 import { Lesson } from './types';
 import { ScheduleMemory } from './scheduleMemory';
+import * as scheduleStore from './scheduleStore';
 import Swiper from 'swiper';
 import 'swiper/css';
 
@@ -107,9 +108,13 @@ export function scheduleComponent(
         this.ingestWeek(weekStartDate, lessons);
         return { lessons };
       } catch (e) {
+        // сеть/api недоступны — пытаемся показать ранее загруженные дни из снапшота
+        const restored = this.tryRestoreOffline(startApi, endApi, weekStartDate);
+        if (restored) return { lessons: restored };
         console.error('loadWeek error', e);
-        this.error = navigator.onLine === false || String(e?.message ?? '').toLowerCase().includes('offline')
-          ? 'Нет соединения — показано ранее загруженное расписание'
+        const networkError = (e as any)?.network === true || navigator.onLine === false;
+        this.error = networkError
+          ? 'Нет соединения — доступно только ранее загруженное расписание'
           : 'Ошибка загрузки расписания.';
         throw e;
       } finally {
@@ -121,20 +126,43 @@ export function scheduleComponent(
       }
     },
 
-    ingestWeek(weekStartDate: Date, lessons: Lesson[]) {
+    // офлайн-резерв из scheduleStore: показываем только реально загруженные дни
+    tryRestoreOffline(startApi: string, endApi: string, weekStartDate: Date): Lesson[] | null {
+      try {
+        const snap = scheduleStore.restoreRange(this.viewMode, this.subjectName, startApi, endApi);
+        if (!snap || snap.knownDates.size === 0) return null;
+        this.ingestWeek(weekStartDate, snap.lessons, { persist: false, knownDays: snap.knownDates });
+        return snap.lessons;
+      } catch (err) {
+        console.error('tryRestoreOffline error', err);
+        return null;
+      }
+    },
+
+    ingestWeek(weekStartDate: Date, lessons: Lesson[], opts: { persist?: boolean; knownDays?: Set<string> | null } = {}) {
+      const persist = opts.persist ?? true;
+      const knownDays = opts.knownDays ?? null;
+
       const days = DateUtils.rangeDays(weekStartDate, 7);
+      const saved: Array<[string, Lesson[]]> = [];
       for (const d of days) {
         const ds = DateUtils.toIsoDate(d);
+        if (knownDays && !knownDays.has(ds)) continue; // офлайн: неизвестные дни не трогаем
         const lessonsForDay = lessons.filter(l => l.date === ds);
         mem.mergeDay(ds, lessonsForDay);
+        saved.push([ds, mem.getDay(ds)]);
       }
 
       for (const l of lessons) {
         if (!mem.hasDay(l.date)) mem.setDay(l.date, [l]);
       }
 
-      const weekEnd = DateUtils.addDays(weekStartDate, 6);
-      mem.ensureDaysRange(weekStartDate, weekEnd);
+      if (!knownDays) {
+        const weekEnd = DateUtils.addDays(weekStartDate, 6);
+        mem.ensureDaysRange(weekStartDate, weekEnd);
+      }
+
+      if (persist && saved.length > 0) scheduleStore.saveDays(this.viewMode, this.subjectName, saved);
 
       this.updateGroupedSchedule();
     },

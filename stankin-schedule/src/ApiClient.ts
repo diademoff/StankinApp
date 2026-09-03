@@ -24,6 +24,13 @@ export class ApiClient {
 
       return await res.json();
     } catch (error) {
+      // ошибка уровня сети/SW (нет статуса HTTP): TypeError, 'Failed to fetch',
+      // офлайн-отказ SW — помечаем, чтобы UI не полагался на navigator.onLine
+      const err: any = error;
+      if (err && err.status == null) {
+        const msg = String(err?.message ?? '');
+        err.network = err instanceof TypeError || /offline|failed to fetch|network|load failed/i.test(msg);
+      }
       console.error('API request failed:', url, error);
       throw error;
     }

@@ -1,5 +1,23 @@
 import { ApiClient } from './ApiClient';
 
+const GROUPS_STORAGE_KEY = 'stankin-groups-v1';
+const TEACHERS_STORAGE_KEY = 'stankin-teachers-v1';
+
+function storeList(key: string, items: string[]) {
+  try { localStorage.setItem(key, JSON.stringify(items)); } catch {}
+}
+
+function readStoredList(key: string): string[] | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 export function scheduleApp(api: ApiClient) {
   return {
     groups: [] as string[],
@@ -57,6 +75,7 @@ export function scheduleApp(api: ApiClient) {
     },
 
     isNetworkFailure(e: any): boolean {
+      if (e?.network === true) return true;
       if (navigator.onLine === false) return true;
       const msg = String(e?.message ?? '').toLowerCase();
       return /offline|failed to fetch|network|internet|load failed/i.test(msg);
@@ -68,6 +87,7 @@ export function scheduleApp(api: ApiClient) {
       try {
         const groups = await api.getGroups();
         this.groups = Array.isArray(groups) ? groups : [];
+        storeList(GROUPS_STORAGE_KEY, this.groups);
         this.scheduleUnavailable = false;
         this.offline = false;
       } catch (e: any) {
@@ -77,6 +97,11 @@ export function scheduleApp(api: ApiClient) {
         }
         this.offline = this.isNetworkFailure(e);
         this.scheduleUnavailable = false;
+        // офлайн-резерв списка групп из localStorage (не зависит от SW)
+        if (this.groups.length === 0) {
+          const saved = readStoredList(GROUPS_STORAGE_KEY);
+          if (saved && saved.length > 0) this.groups = saved;
+        }
         console.error('loadGroups error', e);
         this.error = this.offline
           ? 'Нет соединения — доступно только ранее загруженное расписание'
@@ -110,10 +135,15 @@ export function scheduleApp(api: ApiClient) {
       try {
         const teachers = await api.getTeachers();
         this.teachers = Array.isArray(teachers) ? teachers : [];
+        storeList(TEACHERS_STORAGE_KEY, this.teachers);
         this.offline = false;
       } catch (e) {
         this.offline = this.isNetworkFailure(e);
         this.scheduleUnavailable = false;
+        if (this.teachers.length === 0) {
+          const saved = readStoredList(TEACHERS_STORAGE_KEY);
+          if (saved && saved.length > 0) this.teachers = saved;
+        }
         console.error('loadTeachers error', e);
         this.error = this.offline
           ? 'Нет соединения — доступно только ранее загруженное расписание'
