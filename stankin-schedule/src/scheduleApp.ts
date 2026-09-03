@@ -33,6 +33,7 @@ export function scheduleApp(api: ApiClient) {
     scheduleUnavailable: null as boolean | null,
     offline: false,
     boardNewThreads: 0,
+    netBound: false,
 
     get filteredTeachers(): string[] {
       const q = this.teacherSearch.trim().toLowerCase();
@@ -53,25 +54,58 @@ export function scheduleApp(api: ApiClient) {
     },
 
     async init() {
+      // сохранённые выбор и списки применяем сразу — первый кадр не ждёт сеть
+      const savedMode = localStorage.getItem('viewMode') as 'group' | 'teacher' | null;
+      if (savedMode) this.viewMode = savedMode;
+      const savedGroup = localStorage.getItem('selectedGroup');
+      if (savedGroup) this.selectedGroup = savedGroup;
+      const savedTeacher = localStorage.getItem('selectedTeacher');
+      if (savedTeacher) this.selectedTeacher = savedTeacher;
+
+      this.groups = readStoredList(GROUPS_STORAGE_KEY) ?? [];
+      if (this.viewMode === 'teacher') this.teachers = readStoredList(TEACHERS_STORAGE_KEY) ?? [];
+
+      if (navigator.onLine === false) {
+        // офлайн: сети нет — сразу офлайн-режим без сетевых попыток
+        this.offline = true;
+        this.scheduleUnavailable = false;
+        this.attachNetworkListeners();
+        return;
+      }
+
+      // онлайн: рисуем на локальных данных мгновенно, сеть обновляет в фоне
+      this.attachNetworkListeners();
+      void this.refreshOnline();
+    },
+
+    // сетевой апдейт групп/бейджа/преподавателей в фоне (не блокирует первый кадр)
+    async refreshOnline() {
       await this.loadGroups();
       await this.loadBoardBadge();
       if (this.scheduleUnavailable) {
         this.startAvailabilityPoll();
         return;
       }
-
-      const savedMode = localStorage.getItem('viewMode') as 'group' | 'teacher' | null;
-      if (savedMode) this.viewMode = savedMode;
-
-      const savedGroup = localStorage.getItem('selectedGroup');
-      if (savedGroup) this.selectedGroup = savedGroup;
-
-      const savedTeacher = localStorage.getItem('selectedTeacher');
-      if (savedTeacher) this.selectedTeacher = savedTeacher;
-
       if (this.viewMode === 'teacher' && this.teachers.length === 0) {
         await this.loadTeachers();
       }
+    },
+
+    attachNetworkListeners() {
+      if (this.netBound) return;
+      this.netBound = true;
+      window.addEventListener('offline', () => {
+        this.offline = true;
+        this.scheduleUnavailable = false;
+        if (this.groups.length === 0) {
+          const saved = readStoredList(GROUPS_STORAGE_KEY);
+          if (saved && saved.length > 0) this.groups = saved;
+        }
+      });
+      window.addEventListener('online', () => {
+        this.offline = false;
+        void this.refreshOnline();
+      });
     },
 
     isNetworkFailure(e: any): boolean {

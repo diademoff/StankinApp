@@ -35,6 +35,7 @@ export function scheduleComponent(
     relatedLessons: [] as Lesson[],
     loadingRelated: false,
     onScheduleUpdate: null as ((e: MessageEvent) => void) | null,
+    onNetOnline: null as (() => void) | null,
 
     updateGroupedSchedule() {
       const raw = mem.asGroupedObject();
@@ -87,6 +88,16 @@ export function scheduleComponent(
 
       const startApi = DateUtils.toIsoDate(weekStartDate);
       const endApi   = DateUtils.toIsoDate(DateUtils.addDays(weekStartDate, 6));
+
+      // офлайн: не ходим в сеть вообще — сразу из снапшота
+      if (navigator.onLine === false) {
+        this.error = null;
+        const restored = this.tryRestoreOffline(startApi, endApi, weekStartDate);
+        this.initialLoadDone = true;
+        if (restored) return { lessons: restored };
+        this.error = 'Нет соединения — доступно только ранее загруженное расписание';
+        return;
+      }
 
       try {
         if (direction === 'top')         this.loadingTop    = true;
@@ -351,14 +362,21 @@ export function scheduleComponent(
       this.isEmptySchedule = true;
       this.weekStart = DateUtils.startOfWeek(new Date());
 
+      // SW присылает свежую неделю (SCHEDULE_UPDATED) после фоновой актуализации;
+      // слушатели вешаем до загрузки, чтобы работали и при первом же офлайн-отказе
+      const self = this;
+      this.onScheduleUpdate = (e) => self.applyScheduleUpdate(e);
+      window.addEventListener('message', this.onScheduleUpdate);
+      // вернулась сеть — догружаем открытую неделю из сети
+      this.onNetOnline = () => {
+        self.loadWeek(self.weekStart, 'initial').catch(() => {});
+      };
+      window.addEventListener('online', this.onNetOnline);
+
       try {
         await this.loadWeek(this.weekStart, 'initial');
         this.updateGroupedSchedule();
 
-        // SW присылает свежую неделю (SCHEDULE_UPDATED) после фоновой актуализации
-        const self = this;
-        this.onScheduleUpdate = (e) => self.applyScheduleUpdate(e);
-        window.addEventListener('message', this.onScheduleUpdate);
         await (this as any).$nextTick();
 
         const container = (this as any).$refs.scheduleContainer;
@@ -448,6 +466,10 @@ export function scheduleComponent(
       if (this.onScheduleUpdate) {
         window.removeEventListener('message', this.onScheduleUpdate);
         this.onScheduleUpdate = null;
+      }
+      if (this.onNetOnline) {
+        window.removeEventListener('online', this.onNetOnline);
+        this.onNetOnline = null;
       }
     },
 
