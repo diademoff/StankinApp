@@ -11,6 +11,39 @@ declare const self: ServiceWorkerGlobalScope;
 precacheAndRoute(self.__WB_MANIFEST || []);
 
 // ============================================================================
+// Офлайн-оболочка: открытие PWA (например, по "/" из иконки) без сети
+// ============================================================================
+// precache покрывает только точные пути файлов (index.html, board.html…), но не
+// корень "/". Здесь кэшируем успешно открытые страницы и отдаём их при офлайне.
+const APP_SHELL_CACHE = 'app-shell-v1';
+
+async function serveNavigation(request: Request): Promise<Response> {
+  const cache = await caches.open(APP_SHELL_CACHE);
+  try {
+    const resp = await fetch(request);
+    if (resp.ok) {
+      const ct = resp.headers.get('content-type') || '';
+      if (ct.includes('text/html')) {
+        await cache.put(request, resp.clone());
+        await cache.put('/index.html', resp.clone());
+      }
+    }
+    return resp;
+  } catch {
+    const fromUrl = await cache.match(request);
+    if (fromUrl) return fromUrl;
+    const fallback = await cache.match('/index.html');
+    if (fallback) return fallback;
+    return Response.error();
+  }
+}
+
+registerRoute(
+  ({ request }) => request.mode === 'navigate',
+  ({ request }) => serveNavigation(request)
+);
+
+// ============================================================================
 // Расписание и списки: мгновенно из кэша → фоновая актуализация → live-обновление
 // ============================================================================
 // Приоритет: свежесть не критична (БД пересобирается раз в день), но офлайн/падение

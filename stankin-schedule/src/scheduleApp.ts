@@ -76,6 +76,7 @@ export function scheduleApp(api: ApiClient) {
           return;
         }
         this.offline = this.isNetworkFailure(e);
+        this.scheduleUnavailable = false;
         console.error('loadGroups error', e);
         this.error = this.offline
           ? 'Нет соединения — доступно только ранее загруженное расписание'
@@ -112,6 +113,7 @@ export function scheduleApp(api: ApiClient) {
         this.offline = false;
       } catch (e) {
         this.offline = this.isNetworkFailure(e);
+        this.scheduleUnavailable = false;
         console.error('loadTeachers error', e);
         this.error = this.offline
           ? 'Нет соединения — доступно только ранее загруженное расписание'
