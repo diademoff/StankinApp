@@ -13,6 +13,7 @@ export function scheduleApp(api: ApiClient) {
     teacherSearch: '',
     showPicker: false,
     scheduleUnavailable: null as boolean | null,
+    offline: false,
     boardNewThreads: 0,
 
     get filteredTeachers(): string[] {
@@ -55,6 +56,12 @@ export function scheduleApp(api: ApiClient) {
       }
     },
 
+    isNetworkFailure(e: any): boolean {
+      if (navigator.onLine === false) return true;
+      const msg = String(e?.message ?? '').toLowerCase();
+      return /offline|failed to fetch|network|internet|load failed/i.test(msg);
+    },
+
     async loadGroups() {
       this.loadingGroups = true;
       this.error = null;
@@ -62,13 +69,17 @@ export function scheduleApp(api: ApiClient) {
         const groups = await api.getGroups();
         this.groups = Array.isArray(groups) ? groups : [];
         this.scheduleUnavailable = false;
+        this.offline = false;
       } catch (e: any) {
         if (e?.status === 503) {
           this.scheduleUnavailable = true;
           return;
         }
+        this.offline = this.isNetworkFailure(e);
         console.error('loadGroups error', e);
-        this.error = 'Не удалось загрузить список групп';
+        this.error = this.offline
+          ? 'Нет соединения — доступно только ранее загруженное расписание'
+          : 'Не удалось загрузить список групп';
       } finally {
         this.loadingGroups = false;
       }
@@ -98,9 +109,13 @@ export function scheduleApp(api: ApiClient) {
       try {
         const teachers = await api.getTeachers();
         this.teachers = Array.isArray(teachers) ? teachers : [];
+        this.offline = false;
       } catch (e) {
+        this.offline = this.isNetworkFailure(e);
         console.error('loadTeachers error', e);
-        this.error = 'Не удалось загрузить список преподавателей';
+        this.error = this.offline
+          ? 'Нет соединения — доступно только ранее загруженное расписание'
+          : 'Не удалось загрузить список преподавателей';
       } finally {
         this.loadingTeachers = false;
       }

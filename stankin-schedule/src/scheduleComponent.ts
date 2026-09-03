@@ -33,6 +33,7 @@ export function scheduleComponent(
     selectedLessonForModal: null as Lesson | null,
     relatedLessons: [] as Lesson[],
     loadingRelated: false,
+    onScheduleUpdate: null as ((e: MessageEvent) => void) | null,
 
     updateGroupedSchedule() {
       const raw = mem.asGroupedObject();
@@ -103,25 +104,13 @@ export function scheduleComponent(
         }
         lessons = (items ?? []) as Lesson[];
 
-        const days = DateUtils.rangeDays(weekStartDate, 7);
-        for (const d of days) {
-          const ds = DateUtils.toIsoDate(d);
-          const lessonsForDay = lessons.filter(l => l.date === ds);
-          mem.mergeDay(ds, lessonsForDay);
-        }
-
-        for (const l of lessons) {
-          if (!mem.hasDay(l.date)) mem.setDay(l.date, [l]);
-        }
-
-        const weekEnd = DateUtils.addDays(weekStartDate, 6);
-        mem.ensureDaysRange(weekStartDate, weekEnd);
-
-        this.updateGroupedSchedule();
+        this.ingestWeek(weekStartDate, lessons);
         return { lessons };
       } catch (e) {
         console.error('loadWeek error', e);
-        this.error = 'Ошибка загрузки расписания.';
+        this.error = navigator.onLine === false || String(e?.message ?? '').toLowerCase().includes('offline')
+          ? 'Нет соединения — показано ранее загруженное расписание'
+          : 'Ошибка загрузки расписания.';
         throw e;
       } finally {
         this.loading       = false;
@@ -130,6 +119,24 @@ export function scheduleComponent(
         this.loadingDir    = null;
         this.initialLoadDone = true;
       }
+    },
+
+    ingestWeek(weekStartDate: Date, lessons: Lesson[]) {
+      const days = DateUtils.rangeDays(weekStartDate, 7);
+      for (const d of days) {
+        const ds = DateUtils.toIsoDate(d);
+        const lessonsForDay = lessons.filter(l => l.date === ds);
+        mem.mergeDay(ds, lessonsForDay);
+      }
+
+      for (const l of lessons) {
+        if (!mem.hasDay(l.date)) mem.setDay(l.date, [l]);
+      }
+
+      const weekEnd = DateUtils.addDays(weekStartDate, 6);
+      mem.ensureDaysRange(weekStartDate, weekEnd);
+
+      this.updateGroupedSchedule();
     },
 
     async loadMore(direction: 'top' | 'bottom') {
@@ -237,6 +244,31 @@ export function scheduleComponent(
       this.observerBottom = null;
     },
 
+    // свежая неделя от SW после фоновой актуализации — перерисовка без рефетча
+    applyScheduleUpdate(e: MessageEvent) {
+      const data = (e as any).data;
+      if (!data || data.type !== 'SCHEDULE_UPDATED') return;
+      try {
+        const url = new URL(data.url, location.origin);
+        const params = url.searchParams;
+        if (params.has('subject')) return; // by-subject — не в ленту
+        if (this.viewMode === 'teacher') {
+          if (params.get('teacherName') !== this.subjectName) return;
+        } else {
+          if (params.get('groupName') !== this.subjectName) return;
+        }
+        const startApi = params.get('startDate');
+        if (!startApi || !mem.hasDay(startApi)) return; // неделя уже открыта в памяти
+
+        const parsed = JSON.parse(data.data);
+        const items = Array.isArray(parsed) ? parsed : (parsed?.items ?? []);
+        const weekStart = new Date(startApi + 'T00:00:00');
+        this.ingestWeek(weekStart, items as Lesson[]);
+      } catch (err) {
+        console.error('applyScheduleUpdate error', err);
+      }
+    },
+
     updateDateRanges() {
       const prevStart = DateUtils.addDays(this.weekStart, -7);
       this.dateRanges[0] = DateUtils.rangeDays(prevStart, 7).map(DateUtils.toIsoDate);
@@ -295,6 +327,10 @@ export function scheduleComponent(
         await this.loadWeek(this.weekStart, 'initial');
         this.updateGroupedSchedule();
 
+        // SW присылает свежую неделю (SCHEDULE_UPDATED) после фоновой актуализации
+        const self = this;
+        this.onScheduleUpdate = (e) => self.applyScheduleUpdate(e);
+        window.addEventListener('message', this.onScheduleUpdate);
         await (this as any).$nextTick();
 
         const container = (this as any).$refs.scheduleContainer;
@@ -381,6 +417,10 @@ export function scheduleComponent(
 
     destroy() {
       this.disconnectObservers();
+      if (this.onScheduleUpdate) {
+        window.removeEventListener('message', this.onScheduleUpdate);
+        this.onScheduleUpdate = null;
+      }
     },
 
     openDiscussionModal(lesson: Lesson) {
