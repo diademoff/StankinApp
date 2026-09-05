@@ -127,7 +127,8 @@ export function scheduleComponent(
         this.error = networkError
           ? 'Нет соединения — доступно только ранее загруженное расписание'
           : 'Ошибка загрузки расписания.';
-        throw e;
+        // не пробрасываем: ошибка показана через this.error, состояние Alpine не сбивается
+        return null;
       } finally {
         this.loading       = false;
         this.loadingTop    = false;
@@ -185,6 +186,12 @@ export function scheduleComponent(
         const anchorDate = earliest ? new Date(earliest + 'T00:00:00') : DateUtils.startOfWeek(new Date());
         const newWeekStart = DateUtils.startOfWeek(DateUtils.addDays(anchorDate, -7));
 
+        // неделя уже полностью в памяти — сети не нужно
+        if (this.ensureWeekIsLoadedInMemory(newWeekStart)) {
+          this.updateGroupedSchedule();
+          return;
+        }
+
         const container = (this as any).$refs?.scheduleContainer;
         let prevScrollHeight = 0, prevScrollTop = 0;
         if (container) {
@@ -192,7 +199,9 @@ export function scheduleComponent(
           prevScrollTop    = container.scrollTop;
         }
 
-        await this.loadWeek(newWeekStart, 'top');
+        try {
+          await this.loadWeek(newWeekStart, 'top');
+        } catch { /* ошибка показана через this.error */ }
 
         if (container) {
           const delta = container.scrollHeight - prevScrollHeight;
@@ -203,7 +212,15 @@ export function scheduleComponent(
         const latest     = mem.latestDate();
         const anchorDate = latest ? new Date(latest + 'T00:00:00') : DateUtils.startOfWeek(new Date());
         const newWeekStart = DateUtils.startOfWeek(DateUtils.addDays(anchorDate, 7));
-        await this.loadWeek(newWeekStart, 'bottom');
+
+        if (this.ensureWeekIsLoadedInMemory(newWeekStart)) {
+          this.updateGroupedSchedule();
+          return;
+        }
+
+        try {
+          await this.loadWeek(newWeekStart, 'bottom');
+        } catch { /* ошибка показана через this.error */ }
       }
     },
 
@@ -318,6 +335,14 @@ export function scheduleComponent(
 
     async init() {
       this.updateDateRanges();
+
+      // Alpine удаляет DOM при смене группы/преподавателя (x-if), но сам destroy()
+      // не вызывает: регистрируем очистку слушателей на teardown элемента.
+      const el = (this as any).$el;
+      if (el) {
+        if (!el._x_cleanups) el._x_cleanups = [];
+        el._x_cleanups.push(() => this.destroy());
+      }
 
       (this as any).$nextTick(() => {
         const self = this;
@@ -462,6 +487,10 @@ export function scheduleComponent(
     },
 
     destroy() {
+      if (this.swiperInstance) {
+        try { this.swiperInstance.destroy(true, true); } catch { /* уже уничтожен */ }
+        this.swiperInstance = null;
+      }
       this.disconnectObservers();
       if (this.onScheduleUpdate) {
         window.removeEventListener('message', this.onScheduleUpdate);

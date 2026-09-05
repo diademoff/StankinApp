@@ -1,6 +1,6 @@
 export const aboutConfig = {
   version: 'PWA v2 • API v2',
-  scheduleDate: '08.2026',
+  scheduleDate: '31.08.2026',
   copyright: '© 2025-2026, StankinApp. Все права защищены.',
   email: 'stankinapp@yandex.ru',
   pgpFingerprint: 'EABC 29F7 80AB D7D3 B442 199B C72A B7E2 992F 70F7',

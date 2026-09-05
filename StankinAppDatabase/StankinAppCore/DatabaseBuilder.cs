@@ -82,6 +82,21 @@ public class DatabaseBuilder
                     FOREIGN KEY (lesson_id) REFERENCES lessons(id)
                 );";
         command.ExecuteNonQuery();
+
+        // индексы под запросы API: фильтр по дате и джойны к справочникам
+        command.CommandText = """
+            CREATE INDEX IF NOT EXISTS idx_schedule_dates_date ON schedule_dates(date);
+            CREATE INDEX IF NOT EXISTS idx_schedule_dates_lesson_id ON schedule_dates(lesson_id);
+            CREATE INDEX IF NOT EXISTS idx_lessons_teacher_id ON lessons(teacher_id);
+            CREATE INDEX IF NOT EXISTS idx_lessons_room_id ON lessons(room_id);
+            CREATE INDEX IF NOT EXISTS idx_lessons_session_id ON lessons(session_id);
+            CREATE INDEX IF NOT EXISTS idx_sessions_group_id ON sessions(group_id);
+            """;
+        command.ExecuteNonQuery();
+
+        // WAL: чтения API не блокируются записью сборщика
+        command.CommandText = "PRAGMA journal_mode = WAL;";
+        command.ExecuteNonQuery();
     }
 
     public void InsertGroupSchedule(string groupName, List<Course> courses, int currentYear)

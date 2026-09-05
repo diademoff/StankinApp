@@ -17,13 +17,32 @@ export default defineConfig({
         theme_color: '#ffffff',
         background_color: '#ffffff',
         display: 'standalone',
+        display_override: ['standalone', 'minimal-ui'],
+        orientation: 'portrait',
+        categories: ['education', 'utilities'],
         lang: 'ru',
         start_url: '/',
         icons: [
-          { src: "/icons/icon-128.png", sizes: "128x128", type: "image/png" },
-          { src: "/icons/icon-256.png", sizes: "256x256", type: "image/png" },
-          { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
-          { src: "/icons/icon-1024.png", sizes: "1024x1024", type: "image/png" }
+          { src: "/icons/icon-128.png", sizes: "128x128", type: "image/png", purpose: "any" },
+          { src: "/icons/icon-256.png", sizes: "256x256", type: "image/png", purpose: "any" },
+          { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "/icons/icon-1024.png", sizes: "1024x1024", type: "image/png", purpose: "any" },
+          { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+          { src: "/icons/icon-1024.png", sizes: "1024x1024", type: "image/png", purpose: "maskable" }
+        ],
+        shortcuts: [
+          {
+            name: 'Расписание',
+            short_name: 'Расписание',
+            url: '/',
+            icons: [{ src: "/icons/icon-128.png", sizes: "128x128", type: "image/png" }]
+          },
+          {
+            name: 'О приложении',
+            short_name: 'О приложении',
+            url: '/about.html',
+            icons: [{ src: "/icons/icon-128.png", sizes: "128x128", type: "image/png" }]
+          }
         ]
       }
     })

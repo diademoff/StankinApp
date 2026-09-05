@@ -25,6 +25,7 @@ async function serveNavigation(request: Request): Promise<Response> {
       const ct = resp.headers.get('content-type') || '';
       if (ct.includes('text/html')) {
         await cache.put(request, resp.clone());
+        await cache.put(navKey(request), resp.clone());
         await cache.put('/index.html', resp.clone());
       }
     }
@@ -32,10 +33,21 @@ async function serveNavigation(request: Request): Promise<Response> {
   } catch {
     const fromUrl = await cache.match(request);
     if (fromUrl) return fromUrl;
+    // офлайн по прямому пути: отдаём снапшот именно этой страницы,
+    // а не index.html для всех (например /board.html при будущем мердже board)
+    const pageShell = await cache.match(navKey(request));
+    if (pageShell) return pageShell;
     const fallback = await cache.match('/index.html');
     if (fallback) return fallback;
     return Response.error();
   }
+}
+
+// ключ-«оболочка» страницы без query: '/' -> '/index.html', иначе путь как есть
+function navKey(request: Request): string {
+  const pathname = new URL(request.url).pathname;
+  if (pathname === '/' || pathname === '') return '/index.html';
+  return pathname;
 }
 
 registerRoute(
@@ -132,6 +144,10 @@ async function revalidate(request: Request, url: URL, cache: Cache): Promise<voi
     await cache.put(request, fresh);
     await scheduleExpiration.updateTimestamp(request.url);
     await scheduleExpiration.expireEntries();
+
+    // by-subject (список занятий курса в модалке) в живую ленту не попадает —
+    // будить страницы перерисовкой незачем, кэш всё равно обновлён
+    if (url.pathname.includes('/by-subject')) return;
 
     const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     for (const client of clients) {
