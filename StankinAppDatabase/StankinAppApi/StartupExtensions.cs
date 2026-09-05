@@ -1,7 +1,11 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Net.Http.Headers;
 using Serilog;
 using StankinAppApi.Dto;
 using StankinAppCore;
@@ -15,8 +19,6 @@ static class StartupExtensions
         path.StartsWithSegments("/api/groups") ||
         path.StartsWithSegments("/api/teachers") ||
         path.StartsWithSegments("/api/rooms");
-<<<<<<< Updated upstream
-=======
 
     static bool ScheduleDbReady(string dbPath)
     {
@@ -41,7 +43,6 @@ static class StartupExtensions
 
     const int MaxPostLength = 4000;
 
->>>>>>> Stashed changes
     static string[] AvailableIp =
     [
       "stankinapp.ru"
@@ -129,9 +130,11 @@ static class StartupExtensions
         var dbPath = app.Configuration.GetValue<string>("Database:Path");
         var absoluteDbPath = Path.IsPathRooted(dbPath) ? dbPath : Path.Combine(app.Environment.ContentRootPath, dbPath);
 
+        // готовность БД проверяем до первого успеха; дальше — без обращения к файлу на каждый запрос
+        var gate = new DbReadinessGate(debugMode ? null : absoluteDbPath);
         app.Use(async (ctx, next) =>
         {
-            if (!debugMode && !ScheduleDbReady(absoluteDbPath) && IsScheduleEndpoint(ctx.Request.Path))
+            if (!gate.IsReady() && IsScheduleEndpoint(ctx.Request.Path))
             {
                 ctx.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
                 await ctx.Response.WriteAsJsonAsync(new { error = "Расписание скоро появится" });
@@ -142,25 +145,22 @@ static class StartupExtensions
 
         app.MapControllers();
 
-        app.MapGet("/api/groups", (ScheduleService service, ILogger<Program> log) =>
+        app.MapGet("/api/groups", (HttpContext ctx, IMemoryCache cache, ScheduleService service, ILogger<Program> log) =>
         {
             log.LogInformation("GET /api/groups");
-            var groups = service.GetGroups().ToList();
-            return Results.Ok(new ListResponse<string>(groups));
+            return CachedList(ctx, cache, "list:groups", service.GetGroups, log);
         });
 
-        app.MapGet("/api/rooms", (ScheduleService service, ILogger<Program> log) =>
+        app.MapGet("/api/rooms", (HttpContext ctx, IMemoryCache cache, ScheduleService service, ILogger<Program> log) =>
         {
             log.LogInformation("GET /api/rooms");
-            var rooms = service.GetRooms().ToList();
-            return Results.Ok(new ListResponse<string>(rooms));
+            return CachedList(ctx, cache, "list:rooms", service.GetRooms, log);
         });
 
-        app.MapGet("/api/teachers", (ScheduleService service, ILogger<Program> log) =>
+        app.MapGet("/api/teachers", (HttpContext ctx, IMemoryCache cache, ScheduleService service, ILogger<Program> log) =>
         {
             log.LogInformation("GET /api/teachers");
-            var teachers = service.GetTeachers().ToList();
-            return Results.Ok(new ListResponse<string>(teachers));
+            return CachedList(ctx, cache, "list:teachers", service.GetTeachers, log);
         });
 
         app.MapGet("/api/teachers/validate", (string name, ScheduleService service, ILogger<Program> log) =>
@@ -327,5 +327,57 @@ static class StartupExtensions
 
             return Results.Ok(new ListResponse<CourseDto>(lessons));
         });
+    }
+
+    // Готовность БД кэшируем после первого успеха: повторная проверка через SQLite
+    // на каждый запрос не нужна, пока файл БД не заменили (ребилд идёт редко).
+    sealed class DbReadinessGate
+    {
+        private readonly string _dbPath;
+        private int _ready;
+
+        public DbReadinessGate(string dbPath) => _dbPath = dbPath;
+
+        public bool IsReady()
+        {
+            if (_dbPath == null) return true;
+            if (Volatile.Read(ref _ready) == 1) return true;
+            if (!ScheduleDbReady(_dbPath)) return false;
+            Volatile.Write(ref _ready, 1);
+            return true;
+        }
+    }
+
+    sealed record CachedListValue(string[] Items, string Etag);
+
+    // Справочные списки: кэш в памяти 12ч + Cache-Control/ETag/304,
+    // чтобы SW-ревалидация и повторы браузера не дёргали SQLite.
+    static Task<IResult> CachedList(HttpContext ctx, IMemoryCache cache, string key,
+        Func<IEnumerable<string>> load, ILogger<Program> log)
+    {
+        var ttl = TimeSpan.FromHours(12);
+        if (!cache.TryGetValue(key, out CachedListValue entry))
+        {
+            var items = load().ToArray();
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\u001F', items)));
+            entry = new CachedListValue(items, $"\"{Convert.ToHexString(hash)}\"");
+            cache.Set(key, entry, ttl);
+            log.LogInformation("List {Key} fetched from DB & cached", key);
+        }
+        else
+        {
+            log.LogInformation("List {Key} served from cache", key);
+        }
+
+        ctx.Response.GetTypedHeaders().CacheControl = new CacheControlHeaderValue { Public = true, MaxAge = ttl };
+        ctx.Response.GetTypedHeaders().ETag = new EntityTagHeaderValue(entry.Etag);
+
+        foreach (var candidate in ctx.Request.Headers.IfNoneMatch)
+        {
+            if (candidate == "*" || string.Equals(candidate?.Trim(), entry.Etag, StringComparison.Ordinal))
+                return Task.FromResult(Results.StatusCode(StatusCodes.Status304NotModified));
+        }
+
+        return Task.FromResult<IResult>(Results.Ok(new ListResponse<string>(entry.Items)));
     }
 }

@@ -22,6 +22,19 @@ public class DatabaseReader : IDataReader
 
     private readonly string? _dbPath;
     private readonly SqliteConnection? _sharedConnection;
+    private bool _indexesEnsured;
+
+    // Индексы под горячие запросы: фильтр по дате + джойны lesson->session->group/teacher/room.
+    // Данные живут ~день-семестр, так что создаём единожды на первое подключение (IF NOT EXISTS).
+    private static readonly string[] EnsureIndexSql =
+    [
+        "CREATE INDEX IF NOT EXISTS idx_schedule_dates_date ON schedule_dates(date)",
+        "CREATE INDEX IF NOT EXISTS idx_schedule_dates_lesson_id ON schedule_dates(lesson_id)",
+        "CREATE INDEX IF NOT EXISTS idx_lessons_teacher_id ON lessons(teacher_id)",
+        "CREATE INDEX IF NOT EXISTS idx_lessons_room_id ON lessons(room_id)",
+        "CREATE INDEX IF NOT EXISTS idx_lessons_session_id ON lessons(session_id)",
+        "CREATE INDEX IF NOT EXISTS idx_sessions_group_id ON sessions(group_id)"
+    ];
 
     public DatabaseReader(string dbPath)
     {
@@ -35,8 +48,31 @@ public class DatabaseReader : IDataReader
 
     private SqliteConnection GetOpenConnection()
     {
-        if (_sharedConnection != null)
-            return _sharedConnection;
+        var connection = _sharedConnection ?? CreateOpenConnection();
+        if (!_indexesEnsured)
+        {
+            try
+            {
+                using var cmd = connection.CreateCommand();
+                cmd.CommandText = "PRAGMA busy_timeout = 5000;";
+                cmd.ExecuteNonQuery();
+                foreach (var sql in EnsureIndexSql)
+                {
+                    cmd.CommandText = sql;
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            catch (SqliteException)
+            {
+                // БД read-only или ещё не готова — индексы создаст сборщик при ребилде
+            }
+            _indexesEnsured = true;
+        }
+        return connection;
+    }
+
+    private SqliteConnection CreateOpenConnection()
+    {
         var connection = new SqliteConnection($"Data Source={_dbPath}");
         connection.Open();
         return connection;
