@@ -85,7 +85,8 @@
                   <p class="text-center text-gray-500 py-4 text-sm">Загрузка списка...</p>
                 </template>
                 <template x-if="!loadingTeachers && filteredTeachers.length === 0">
-                  <p class="text-center text-gray-500 py-4 text-sm">Преподаватель не найден</p>
+                  <p class="text-center text-gray-500 py-4 text-sm"
+                    x-text="offline ? 'Нет соединения — список преподавателей недоступен' : 'Преподаватель не найден'"></p>
                 </template>
                 <template x-for="teacher in filteredTeachers" :key="teacher">
                   <button
@@ -134,7 +135,8 @@
               }" class="flex flex-col min-h-0 flex-1 px-4 pb-4 overflow-y-auto">
 
                 <template x-if="!groups || groups.length === 0">
-                  <p class="text-center text-gray-500 py-4 text-sm">Загрузка групп...</p>
+                  <p class="text-center text-gray-500 py-4 text-sm"
+                    x-text="offline && !loadingGroups ? 'Нет соединения — список групп недоступен' : 'Загрузка групп...'"></p>
                 </template>
 
                 <!-- Шаг 1: Год -->
@@ -222,6 +224,9 @@
         <div class="text-center">
           <h1 class="text-2xl font-bold mb-1">Расписание МГТУ Станкин</h1>
           <p class="text-gray-500 text-sm">Выберите режим просмотра</p>
+          <template x-if="offline">
+            <p class="text-amber-600 text-xs mt-2 max-w-xs mx-auto">Нет соединения — доступно только ранее загруженное расписание (если группа/преподаватель уже открывались)</p>
+          </template>
         </div>
         <div class="flex flex-col gap-3 w-full max-w-xs">
           <button

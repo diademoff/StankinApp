@@ -2,6 +2,7 @@ import { ApiClient } from './ApiClient';
 import { DateUtils } from './date-utils';
 import { Lesson } from './types';
 import { ScheduleMemory } from './scheduleMemory';
+import * as scheduleStore from './scheduleStore';
 import Swiper from 'swiper';
 import 'swiper/css';
 
@@ -33,6 +34,8 @@ export function scheduleComponent(
     selectedLessonForModal: null as Lesson | null,
     relatedLessons: [] as Lesson[],
     loadingRelated: false,
+    onScheduleUpdate: null as ((e: MessageEvent) => void) | null,
+    onNetOnline: null as (() => void) | null,
 
     updateGroupedSchedule() {
       const raw = mem.asGroupedObject();
@@ -86,6 +89,16 @@ export function scheduleComponent(
       const startApi = DateUtils.toIsoDate(weekStartDate);
       const endApi   = DateUtils.toIsoDate(DateUtils.addDays(weekStartDate, 6));
 
+      // офлайн: не ходим в сеть вообще — сразу из снапшота
+      if (navigator.onLine === false) {
+        this.error = null;
+        const restored = this.tryRestoreOffline(startApi, endApi, weekStartDate);
+        this.initialLoadDone = true;
+        if (restored) return { lessons: restored };
+        this.error = 'Нет соединения — доступно только ранее загруженное расписание';
+        return;
+      }
+
       try {
         if (direction === 'top')         this.loadingTop    = true;
         else if (direction === 'bottom') this.loadingBottom = true;
@@ -103,25 +116,17 @@ export function scheduleComponent(
         }
         lessons = (items ?? []) as Lesson[];
 
-        const days = DateUtils.rangeDays(weekStartDate, 7);
-        for (const d of days) {
-          const ds = DateUtils.toIsoDate(d);
-          const lessonsForDay = lessons.filter(l => l.date === ds);
-          mem.mergeDay(ds, lessonsForDay);
-        }
-
-        for (const l of lessons) {
-          if (!mem.hasDay(l.date)) mem.setDay(l.date, [l]);
-        }
-
-        const weekEnd = DateUtils.addDays(weekStartDate, 6);
-        mem.ensureDaysRange(weekStartDate, weekEnd);
-
-        this.updateGroupedSchedule();
+        this.ingestWeek(weekStartDate, lessons);
         return { lessons };
       } catch (e) {
+        // сеть/api недоступны — пытаемся показать ранее загруженные дни из снапшота
+        const restored = this.tryRestoreOffline(startApi, endApi, weekStartDate);
+        if (restored) return { lessons: restored };
         console.error('loadWeek error', e);
-        this.error = 'Ошибка загрузки расписания.';
+        const networkError = (e as any)?.network === true || navigator.onLine === false;
+        this.error = networkError
+          ? 'Нет соединения — доступно только ранее загруженное расписание'
+          : 'Ошибка загрузки расписания.';
         throw e;
       } finally {
         this.loading       = false;
@@ -130,6 +135,47 @@ export function scheduleComponent(
         this.loadingDir    = null;
         this.initialLoadDone = true;
       }
+    },
+
+    // офлайн-резерв из scheduleStore: показываем только реально загруженные дни
+    tryRestoreOffline(startApi: string, endApi: string, weekStartDate: Date): Lesson[] | null {
+      try {
+        const snap = scheduleStore.restoreRange(this.viewMode, this.subjectName, startApi, endApi);
+        if (!snap || snap.knownDates.size === 0) return null;
+        this.ingestWeek(weekStartDate, snap.lessons, { persist: false, knownDays: snap.knownDates });
+        return snap.lessons;
+      } catch (err) {
+        console.error('tryRestoreOffline error', err);
+        return null;
+      }
+    },
+
+    ingestWeek(weekStartDate: Date, lessons: Lesson[], opts: { persist?: boolean; knownDays?: Set<string> | null } = {}) {
+      const persist = opts.persist ?? true;
+      const knownDays = opts.knownDays ?? null;
+
+      const days = DateUtils.rangeDays(weekStartDate, 7);
+      const saved: Array<[string, Lesson[]]> = [];
+      for (const d of days) {
+        const ds = DateUtils.toIsoDate(d);
+        if (knownDays && !knownDays.has(ds)) continue; // офлайн: неизвестные дни не трогаем
+        const lessonsForDay = lessons.filter(l => l.date === ds);
+        mem.mergeDay(ds, lessonsForDay);
+        saved.push([ds, mem.getDay(ds)]);
+      }
+
+      for (const l of lessons) {
+        if (!mem.hasDay(l.date)) mem.setDay(l.date, [l]);
+      }
+
+      if (!knownDays) {
+        const weekEnd = DateUtils.addDays(weekStartDate, 6);
+        mem.ensureDaysRange(weekStartDate, weekEnd);
+      }
+
+      if (persist && saved.length > 0) scheduleStore.saveDays(this.viewMode, this.subjectName, saved);
+
+      this.updateGroupedSchedule();
     },
 
     async loadMore(direction: 'top' | 'bottom') {
@@ -237,6 +283,31 @@ export function scheduleComponent(
       this.observerBottom = null;
     },
 
+    // свежая неделя от SW после фоновой актуализации — перерисовка без рефетча
+    applyScheduleUpdate(e: MessageEvent) {
+      const data = (e as any).data;
+      if (!data || data.type !== 'SCHEDULE_UPDATED') return;
+      try {
+        const url = new URL(data.url, location.origin);
+        const params = url.searchParams;
+        if (params.has('subject')) return; // by-subject — не в ленту
+        if (this.viewMode === 'teacher') {
+          if (params.get('teacherName') !== this.subjectName) return;
+        } else {
+          if (params.get('groupName') !== this.subjectName) return;
+        }
+        const startApi = params.get('startDate');
+        if (!startApi || !mem.hasDay(startApi)) return; // неделя уже открыта в памяти
+
+        const parsed = JSON.parse(data.data);
+        const items = Array.isArray(parsed) ? parsed : (parsed?.items ?? []);
+        const weekStart = new Date(startApi + 'T00:00:00');
+        this.ingestWeek(weekStart, items as Lesson[]);
+      } catch (err) {
+        console.error('applyScheduleUpdate error', err);
+      }
+    },
+
     updateDateRanges() {
       const prevStart = DateUtils.addDays(this.weekStart, -7);
       this.dateRanges[0] = DateUtils.rangeDays(prevStart, 7).map(DateUtils.toIsoDate);
@@ -290,6 +361,17 @@ export function scheduleComponent(
       this.groupedSchedule = {};
       this.isEmptySchedule = true;
       this.weekStart = DateUtils.startOfWeek(new Date());
+
+      // SW присылает свежую неделю (SCHEDULE_UPDATED) после фоновой актуализации;
+      // слушатели вешаем до загрузки, чтобы работали и при первом же офлайн-отказе
+      const self = this;
+      this.onScheduleUpdate = (e) => self.applyScheduleUpdate(e);
+      window.addEventListener('message', this.onScheduleUpdate);
+      // вернулась сеть — догружаем открытую неделю из сети
+      this.onNetOnline = () => {
+        self.loadWeek(self.weekStart, 'initial').catch(() => {});
+      };
+      window.addEventListener('online', this.onNetOnline);
 
       try {
         await this.loadWeek(this.weekStart, 'initial');
@@ -381,6 +463,14 @@ export function scheduleComponent(
 
     destroy() {
       this.disconnectObservers();
+      if (this.onScheduleUpdate) {
+        window.removeEventListener('message', this.onScheduleUpdate);
+        this.onScheduleUpdate = null;
+      }
+      if (this.onNetOnline) {
+        window.removeEventListener('online', this.onNetOnline);
+        this.onNetOnline = null;
+      }
     },
 
     openDiscussionModal(lesson: Lesson) {

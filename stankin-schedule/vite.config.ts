@@ -9,6 +9,7 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       injectRegister: 'auto',
+      registerType: 'autoUpdate',
       manifest: {
         name: 'Расписание Stankin',
         short_name: 'Расписание',
